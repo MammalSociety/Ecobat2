@@ -1,0 +1,3216 @@
+---
+title: "Bat Activity Analysis"
+subtitle: 'Site Name: `r params$SiteName`' #for when testing: 'Site Name'
+author: 'Author: `r params$Author`' #for when testing: 'Author'
+date: '`r strftime(Sys.time())`'  #, format = "%d/%m/%Y")`' - kept as is because need time to be there for if need deletions... when testing: 'date'
+output: 
+  #rmarkdown::pdf_document:
+  pdf_document: default  
+  fig_caption: yes 
+geometry: margin=1.5cm
+header-includes:
+#- \usepackage{titling}
+#- \pretitle{\begin{center}\LARGE\includegraphics[width=12cm]{ecobat.jpg}\\[\bigskipamount]}
+#- \posttitle{\end{center}}
+- \usepackage{helvet}  #this line and one below change the font
+- \renewcommand{\familydefault}{\sfdefault}
+#includes:
+#  in_header: my_header.tex
+
+# params:
+#  n: NA
+#  Author: NA
+#  SiteName: NA
+#  token: NA
+---
+
+```{r setup, include=FALSE}
+
+# sets the global options for the word doc (don't show echo of the r code, or warnings etc in the produced word doc)
+
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message=FALSE, comment=NULL)
+
+#source("Ecobat2.R", local = knitr::knit_global())
+# or sys.source("your-script.R", envir = knitr::knit_global())
+
+#NOTE HAVE deleted anywhere where said \newline, check Nightly.Rmd from 20Aug21 to see where they were if need to put back in!!!
+
+```
+
+```{r}
+
+#notes to self about what I've been changing/working on
+
+#ggforce should now be coming from the github package - MammalSociety/ggforce as above
+#there is specific code for the facet_wrap_paginate which should work now the gtable package is in, if the package doesn't work.
+
+
+```
+
+
+
+```{r libraries}
+
+print("Report")
+
+
+library(tidyverse) # consistent approach to data science
+library(rmarkdown) # needed for rmarkdown code
+library(knitr) # needed for rmarkdown word docs etc
+library(dplyr) # data wrangling (execpt percentiles)
+library(plyr) # # percentiles code uses plyr as its older
+library(suncalc) # Sunrise/ sunset times
+library(lubridate) # dates and times formatting
+library(ggplot2) # graphs
+library(rdrop2)
+library(ggforce) #should be from github
+library(gtable) #since doing ggforce fix it now wants this package
+library(pander) # table creation in the markdown doc
+library(reshape2) # wide/short data format conversions
+library(janitor) # add totals rows to bottoms of tables
+library(RColorBrewer) #colourblind friendly scales on figures
+library(rcompanion)
+library(png)
+library(grid)
+library(tinytex)
+
+#use the ggforce on Mammal Soc github
+# library(devtools)
+# install_github("MammalSociety/ggforce2")
+
+```
+
+
+
+```{r}
+
+#I tried to have this code in a functions script but had issues getting it to source it in this script so put it directly in. This is the fixed code for facet_wrap_paginate, renamed function facet_wrap_paginate2... I thought it didn't work but actually it was because it wanted the gtable package loaded in. By then I had sorted the package so am hashing out, however if Shiny.io doesn't connect to the correct ggforce, take out ggforce package and unhash this code. Then also need to go to Nightly.rmd and change all instances of facet_wrap_paginate to facet_wrap_paginate2 (of just take the 2 off the code here!).
+
+# facet_wrap_paginate2 <- function(facets, nrow = NULL, ncol = NULL,
+#                                 scales = 'fixed', shrink = TRUE,
+#                                 labeller = 'label_value', as.table = TRUE,
+#                                 switch = NULL, drop = TRUE, dir = 'h',
+#                                 strip.position = 'top', page = 1) {
+#   facet <- facet_wrap(facets,
+#                       nrow = nrow, ncol = ncol, scales = scales,
+#                       shrink = shrink, labeller = labeller, as.table = as.table,
+#                       switch = switch, drop = drop, dir = dir,
+#                       strip.position = strip.position
+#   )
+#   if (is.null(nrow) || is.null(ncol)) {
+#     facet
+#   } else {
+#     ggproto(NULL, FacetWrapPaginate2,
+#             shrink = shrink,
+#             params = c(facet$params, list(page = page))
+#     )
+#   }
+# }
+# 
+# #' @rdname ggforce-extensions
+# #' @format NULL
+# #' @usage NULL
+# #' @importFrom gtable gtable_add_rows gtable_add_cols
+# #' @export
+# FacetWrapPaginate2 <- ggproto('FacetWrapPaginate2', FacetWrap,
+#                              setup_params = function(data, params) {
+#                                modifyList(
+#                                  params,
+#                                  list(
+#                                    max_rows = params$nrow,
+#                                    nrow = NULL
+#                                  )
+#                                )
+#                              },
+#                              compute_layout = function(data, params) {
+#                                layout <- FacetWrap$compute_layout(data, params)
+#                                layout$page <- ceiling(layout$ROW / params$max_rows)
+#                                layout
+#                              },
+#                              draw_panels = function(panels, layout, x_scales, y_scales, ranges, coord, data,
+#                                                     theme, params) {
+#                                include <- which(layout$page == params$page)
+#                                panels <- panels[include]
+#                                ranges <- ranges[include]
+#                                layout <- layout[include, , drop = FALSE]
+#                                layout$ROW <- layout$ROW - min(layout$ROW) + 1
+#                                x_scale_ind <- unique(layout$SCALE_X)
+#                                x_scales <- x_scales[x_scale_ind]
+#                                layout$SCALE_X <- match(layout$SCALE_X, x_scale_ind)
+#                                y_scale_ind <- unique(layout$SCALE_Y)
+#                                y_scales <- y_scales[y_scale_ind]
+#                                layout$SCALE_Y <- match(layout$SCALE_Y, y_scale_ind)
+#                                table <- FacetWrap$draw_panels(panels, layout, x_scales, y_scales, ranges,
+#                                                               coord, data, theme, params)
+#                                if (max(layout$ROW) != params$max_rows) {
+#                                  spacing <- theme$panel.spacing.y %||% theme$panel.spacing
+#                                  missing_rows <- params$max_rows - max(layout$ROW)
+#                                  strip_rows <- unique(table$layout$t[grepl('strip', table$layout$name) & table$layout$l %in% panel_cols(table)$l])
+#                                  if (length(strip_rows) != 0)
+#                                    strip_rows <- strip_rows[as.numeric(table$heights[strip_rows]) != 0]
+#                                  axis_b_rows <- unique(table$layout$t[grepl('axis-b', table$layout$name)])
+#                                  axis_b_rows <- axis_b_rows[as.numeric(table$heights[axis_b_rows]) != 0]
+#                                  axis_t_rows <- unique(table$layout$t[grepl('axis-t', table$layout$name)])
+#                                  axis_t_rows <- axis_t_rows[as.numeric(table$heights[axis_t_rows]) != 0]
+#                                  table <- gtable_add_rows(table, unit(missing_rows, 'null'))
+#                                  table <- gtable_add_rows(table, spacing * missing_rows)
+#                                  if (length(strip_rows) != 0) {
+#                                    table <- gtable_add_rows(table, min(table$heights[strip_rows]) * missing_rows)
+#                                  }
+#                                  if (params$free$x) {
+#                                    if (length(axis_b_rows) != 0) {
+#                                      table <- gtable_add_rows(table, min(table$heights[axis_b_rows]) * missing_rows)
+#                                    }
+#                                    if (length(axis_t_rows) != 0) {
+#                                      table <- gtable_add_rows(table, min(table$heights[axis_t_rows]) * missing_rows)
+#                                    }
+#                                  }
+#                                }
+#                                if (max(layout$COL) != params$ncol) {
+#                                  spacing <- theme$panel.spacing.x %||% theme$panel.spacing
+#                                  missing_cols <- params$ncol - max(layout$COL)
+#                                  strip_cols <- strip_cols[as.numeric(table$widths[strip_cols]) != 0]
+#                                  if (length(strip_cols) != 0) 
+#                                    strip_cols <- strip_cols[as.numeric(table$widths[strip_cols]) != 0]
+#                                  axis_l_cols <- unique(table$layout$l[grepl('axis-l', table$layout$name)])
+#                                  axis_l_cols <- axis_l_cols[as.numeric(table$widths[axis_l_cols]) != 0]
+#                                  axis_r_cols <- unique(table$layout$l[grepl('axis-r', table$layout$name)])
+#                                  axis_r_cols <- axis_r_cols[as.numeric(table$widths[axis_r_cols]) != 0]
+#                                  table <- gtable_add_cols(table, unit(missing_cols, 'null'))
+#                                  table <- gtable_add_cols(table, spacing * missing_cols)
+#                                  if (length(strip_cols) != 0) {
+#                                    table <- gtable_add_cols(table, min(table$widths[strip_cols]) * missing_cols)
+#                                  }
+#                                  if (params$free$y) {
+#                                    if (length(axis_l_cols) != 0) {
+#                                      table <- gtable_add_cols(table, min(table$widths[axis_l_cols]) * missing_cols)
+#                                    }
+#                                    if (length(axis_r_cols) != 0) {
+#                                      table <- gtable_add_cols(table, min(table$widths[axis_r_cols]) * missing_cols)
+#                                    }
+#                                  }
+#                                }
+#                                table
+#                              }
+# )
+# 
+# #' Determine the number of pages in a paginated facet plot
+# #'
+# #' This is a simple helper that returns the number of pages it takes to plot all
+# #' panels when using [facet_wrap_paginate()] and
+# #' [facet_grid_paginate()]. It partially builds the plot so depending
+# #' on the complexity of your plot it might take some time to calculate...
+# #'
+# #' @param plot A ggplot object using either facet_wrap_paginate or
+# #' facet_grid_paginate
+# #'
+# #' @return If the plot uses  using either facet_wrap_paginate or
+# #' facet_grid_paginate it returns the total number of pages. Otherwise it
+# #' returns NULL
+# #'
+# #' @export
+# #'
+# #' @examples
+# #' p <- ggplot(diamonds) +
+# #'   geom_point(aes(carat, price), alpha = 0.1) +
+# #'   facet_wrap_paginate(~ cut:clarity, ncol = 3, nrow = 3, page = 1)
+# #' n_pages(p)
+# n_pages <- function(plot) {
+#   if (utils::packageVersion('ggplot2') <= '2.2.1') {
+#     page <- ggplot_build(plot)$layout$panel_layout$page
+#   } else {
+#     page <- ggplot_build(plot)$layout$layout$page
+#   }
+#   if (!is.null(page)) {
+#     max(page)
+#   } else {
+#     NULL
+#   }
+# }
+
+```
+
+
+```{r test data}
+
+# TESTING - load in test data / data that needs troubleshooting
+# this should be hashtagged out when deploying to Shiny.io
+
+  # B_data <- read.csv("Bprep.csv")  # - to do this need to unhash the write.csv line in Ecobat.2
+  # B_data <- B_data %>%
+  # select(-"X")
+
+```
+
+```{r data}
+
+# SHINY
+
+# this is here for when the script is finalised and the Shiny app is deployed
+# read data in from shiny
+
+B_data <- Bprep
+
+
+```
+
+
+```{r variables}
+
+# Standardize Variables
+
+
+# Output CSV from Ecobat puts weird symbol in front of location name, so need to remove:
+#cnames <- names(B_data)
+#cnames[grepl('location_name$', cnames)] <- 'location_name'
+#names(B_data) <- cnames
+
+
+# if there is a separate column for date and time then join together to form a new column called Timestamp
+if (("date" %in% colnames(B_data) == TRUE) &
+  ("time" %in% colnames(B_data) == TRUE)) {
+
+B_data$timestamp <- paste(B_data$date, B_data$time) }
+
+
+# format correctly and specify timezone
+# "Europe/London" accounts for daylight savings
+#B_data$DateTime <- lubridate::ymd_hms(B_data$timestamp, tz = "Europe/London")
+
+
+# if above code gives NA, date format is dmy not ymd so do this:
+#if (NA %in% B_data$DateTime) {
+B_data$DateTime <- lubridate::dmy_hms(B_data$timestamp, tz = "Europe/London")
+#}
+
+
+# Create Useful Variables
+
+# `Night` date at dusk - so DateTime minus 12 hours
+# `JustTime` time hh:mm of bat observation (12 hours added so plots correctly as `Night` i.e. dusk to dawn)
+
+B_data2 <- B_data %>% 
+  mutate(Night = DateTime - lubridate::hours(12)) %>% 
+  mutate(Night = lubridate::as_date(Night)) %>%
+  mutate(Month = lubridate::month(Night, label = T)) %>% 
+  filter(!is.na(species)) 
+
+
+```
+
+
+
+
+```{r suntimes}
+
+# Create suntimes
+
+# Use package `suncalcs` to make `sunset` and `sunrise` columns for each `Night` and the location (`lat` and `lon`) of the bat survey.
+
+# Get number nights between first and last bat observation (plus 1 for dawn)
+num_nights <- as.integer(difftime(max(B_data2$Night) , 
+                                  min(B_data2$Night) , 
+                                  units = c("days"))) + 1
+
+# Make a date vector of nights between first and last bat observation.
+nightlist <- seq.Date(from=min(B_data2$Night), 
+                   length.out = num_nights +1, 
+                   by='days')
+
+# Get suntimes for date vector and Location (lat and lon)
+setdata <- getSunlightTimes(date = nightlist, 
+                            lat = median(B_data2$lat, na.rm = TRUE), 
+                            lon = median(B_data2$lon, na.rm = TRUE), 
+                            tz = "Europe/London")
+
+# Duplicate data.frame to make sunrise data
+risedata <- setdata
+
+# Select  sunset date and time
+setdata2 <- setdata %>% 
+  select(date, sunset) %>% 
+  mutate(date = lubridate::as_date(date))
+
+# Select  sunrise date and time
+risedata2 <- risedata %>% 
+  select(date, sunrise) %>% 
+  mutate(date = lubridate::as_date(date)) %>%
+  mutate(date = date - lubridate::days(1))
+
+
+# Combine sunset and risedata by 
+sun_data <- dplyr::full_join(setdata2, risedata2, by="date")
+#sun_data <- na.omit(sun_data) tried but didn't work
+
+# Rename date as Night
+colnames(sun_data) <- c("Night", "sunset", "sunrise")
+
+sun_data <- sun_data %>% 
+  mutate(night_length_hr = as.numeric(difftime(sunrise, sunset, units='hours')),
+         night_length_min = as.numeric(difftime(sunrise, sunset, units='mins')))
+
+
+# Join bat data with the sundata by Night
+joined_data <- dplyr::left_join(B_data2, sun_data, by="Night")
+
+
+## Create Variables Relative to Suntimes and Bat Observation 
+
+# To make sure difference is in minutes/hours etc. use difftime - should be pretty self-explanatory what's what 
+All_data <- joined_data %>% 
+  mutate(post_set_min = as.numeric(difftime(DateTime, sunset,
+                                            units='mins')),
+         pre_rise_min = as.numeric(difftime(sunrise, DateTime,
+                                            units='mins')),
+         post_set_hr = as.numeric(difftime(DateTime, sunset,
+                                           units='hours')),
+         pre_rise_hr = as.numeric(difftime(sunrise, DateTime,
+                                           units='hours')),
+         post_set_hr_int = as.integer(round(post_set_hr,
+                                            digits = 0)),
+         pre_rise_hr_int = as.integer(round(pre_rise_hr,
+                                            digits = 0)))
+
+# FYI: `post_set_hr_int` bat observation time as an integer (hour) after sunset  
+#      + `-0.5` to `0.49` hours is `0` hour   
+#      + `0.5` to `1.49` hours is `1` hour   
+#      + `1.5` to `2.49` hours is `2` hour   
+#      + `2.5` to `3.49` hours is `3` hour ect...
+
+```
+
+
+```{r roost emergence}
+
+#Russ(2012) Bat roost emergence times minutes after sunset
+
+# correspond a common name to each scientific name
+species <- c("Barbastella barbastellus",
+              "Eptesicus serotinus",
+              "Eptesicus",
+              "Myotis alcathoe",
+              "Myotis bechsteinii",
+              "Myotis brandtii",
+              "Myotis daubentonii",
+              "Myotis mystacinus",
+              "Myotis nattereri",
+              "Myotis",
+              "Nyctalus leisleri",
+              "Nyctalus noctula",
+              "Nyctalus",
+              "Nyctaloid",
+              "Pipistrellus nathusii",
+              "Pipistrellus pipistrellus",
+              "Pipistrellus pygmaeus",
+              "Pipistrellus",
+              "Plecotus auritus",
+              "Plecotus austriacus",
+              "Plecotus",
+              "Rhinolophus ferrumequinum",
+              "Rhinolophus hipposideros",
+              "Rhinolophus")
+
+Spp <- c("Barbastelle",
+         "Serotine",
+         "Serotine",
+         "Alcathoe",
+         "Bechstein's",
+         "Brandt's",
+         "Daubenton's",
+         "Whiskered",
+         "Natterer's",
+         "Myotis",
+         "Leisler's",
+         "Noctule",
+         "Nyctalus",
+         "Nyctaloid",
+         "Nathusius'",
+         "Common pipistrelle",
+         "Soprano pipistrelle",
+         "Pipistrellus",
+         "Brown long-eared",
+         "Grey long-eared",
+         "Long-eared bats",
+         "Greater horseshoe",
+         "Lesser horseshoe",
+         "Horseshoe bats")
+
+
+## create a table of roost emergence times for each species
+
+# in order, the lower and upper match, so for Barbastelle which is first in the list, the lower is 25 and the upper is 60 - i.e. barbastelles emerge from roosts 25-60 mins after sunset.
+lower <- c(25, 20, 20, 30, 30, 30, 50, 30, 35, 30, 8, 5, 5, 5, 18, 22, 22, 18, 40, 40, 40, 35, 35, 35)
+upper <- c(60, 25, 25, 35, 33, 35, 70, 35, 55, 70, 18, 9, 18, 25, 28, 32, 28, 32, 60, 60, 60, 48, 50, 50)
+russ <- tibble(species, Spp, lower, upper)
+
+
+```
+
+
+```{r more variables}
+
+#Join with russ data with bat observation data All_data
+All_data <- dplyr::left_join(All_data, russ, by = "species")
+
+# add a column for bat passes per hour
+All_data$passes.per.hour <- round((All_data$passes/All_data$night_length_hr),
+                                  digits = 2)
+
+#################################################################
+
+## create lists to be used for tables and graphs later:
+
+# list of all of the unique locations in the dataset
+Dets <- c(unique(All_data$location_name))
+
+# list of all of the different species in the dataset
+species_list <- unique(All_data$species)
+Spp_list <- unique(All_data$Spp)
+
+# dataframe of survey days 
+Surv.days <- as.data.frame(unique(All_data$Night)) #all unique survey nights
+
+Surv.days.N <- length(Surv.days$`unique(All_data$Night)`) #count of survey nights
+
+Surv.days.M <- Surv.days %>%
+  mutate(Month = lubridate::month((unique(All_data$Night)),
+                                  label = T)) %>%
+  dplyr::count(Month) #count of survey days per month
+
+#################################################################
+
+## GRAPHICS ##
+
+# get a colour-blind friendly colour palette for graphs
+colourCount <- length(unique(All_data$Spp))
+getPalette <- colorRampPalette(brewer.pal(12, "RdBu")) #changed this to 10 but was 9, then changed to 12
+
+# set colour palette for activity levels in graphs
+#cbbPalette <- c("#D55E00", "#0072B2","#56B4E9","#009E73","#E69F00") #original palette but needs one extra colour
+cbbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+
+# specify order for the species to be listed in
+All_data$Spp <- factor(All_data$Spp,levels=c("Pipistrellus", "Common pipistrelle", "Soprano pipistrelle", "Nathusius'", "Noctule", "Leisler's", "Nyctalus", "Serotine", "Nyctaloid", "Brown long-eared", "Grey long-eared", "Long-eared bats", "Myotis","Alcathoe", "Bechstein's",  "Brandt's", "Daubenton's","Whiskered", "Natterer's", "Barbastelle", "Greater horseshoe", "Lesser horseshoe", "Horseshoe bats"))
+         
+```
+
+
+# Summary
+
+Bats were detected on **`r Surv.days.N`** nights between **`r min(All_data$Night)`** and **`r max(All_data$Night)`**, using **`r (length(Dets))`** static bat detectors. Throughout this period **`r (length(species_list))`** species were recorded. **Table 1.** Detectors were placed at the following locations:
+
+```{r det locations}
+
+# table of detector names and locations used
+Table <- All_data %>%
+  dplyr::select(location_name, lat, lon) %>%
+  dplyr::group_by(location_name, lat, lon) %>%
+  dplyr::distinct() %>%
+  dplyr::rename("Detector ID" = location_name, "Latitude" = lat,
+                "Longitude" = lon)
+
+knitr::kable(Table, align = "l")
+
+
+```
+
+\newpage
+
+# Survey Nights
+**Table 2.** The number of nights that bats were detected on each recorder. This is not the same as the number of nights that detectors were active if there were nights when no bats were detected.
+
+```{r detector nights}
+
+Table <- All_data %>%
+  dplyr::group_by(location_name) %>%
+  dplyr::summarise(count = n_distinct(Night)) %>%
+  dplyr::arrange(location_name) %>%
+  dplyr::rename("Detector ID" = location_name) %>%
+  dplyr::rename("No. of nights" = count)
+
+knitr::kable(Table, align = "l")
+
+```
+
+\newpage
+
+# Survey Nights
+
+
+**Figure 1.** Horizontal bars show nights when acoustic detectors recorded bats.
+
+
+```{r fig.width=12, fig.height=9}
+
+## this code works out the start and end dates of each time the detector is active through time
+
+Effort <- All_data %>%
+  dplyr::arrange(location_name, Night) %>%
+  dplyr::group_by(location_name, Night) %>%
+  dplyr::filter(row_number()==1) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(location_name, Night) %>%
+  dplyr::group_by(location_name) %>%
+  dplyr::mutate(diff_days = round(as.numeric(difftime(Night, lag(Night), units='days')), digits = 1)) %>%
+  replace(is.na(.), 0) %>%
+  dplyr::mutate(start = if_else(diff_days == 0 | diff_days > 1, paste(as.Date(Night)), "")) %>%
+  dplyr::mutate(end = if_else(start != "", paste(lag(as.Date(Night))), "")) %>%
+  #dplyr::mutate(end = ifelse(row_number()==n(), paste(as.Date(Night)), end)) %>% #NOTE if someone has issues and they only have one row of data you may need to unhash this - see emails with Beth on 11/03/2020 info account
+  dplyr::filter(start != "" | end != "") %>%
+  dplyr::mutate_at(c("end"), funs(lead), n=1) %>%
+  replace(is.na(.), "0") %>%
+  dplyr::mutate_at(c("end"), funs(ifelse(. == 0, paste(as.Date(start)), .))) %>%
+  dplyr::filter(end != "NA")
+
+
+Effort$start <- as.Date(Effort$start)
+Effort$end <- as.Date(Effort$end)
+Effort$location_name <- as.character(Effort$location_name)
+
+
+## horizontal segment graph showing the nights when detectors detected bat passes - singular nights represented as a circle, others should be rounded rectangles ##
+
+Effort %>%
+  ggplot() +
+  geom_segment(aes(x=start, xend=end, y=location_name, yend=location_name), size = 4) +
+  geom_point(aes(start, location_name), colour = "black",  shape = 16, size = 3.6) +
+  geom_point(aes(end, location_name),  colour = "black", shape = 16, size = 3.6) +
+  xlab("\nDate") +
+  ylab("Detector ID\n") +
+  scale_x_date(date_labels = "%d %b %y") +
+  theme_bw() +
+  theme(legend.position = "none") +
+  theme (axis.title.y = element_text(colour="black", size=16,
+                                     face="bold")) +
+  theme (axis.title.x = element_text(colour="black", size=16,
+                                     face="bold")) +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour="black", linetype="solid"),
+        axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid")) +
+  theme(axis.text.x = element_text(size=14, hjust=1, vjust=0.5,
+                                   colour = "black", angle = 90)) +
+  theme(axis.text.y = element_text(size = 14, colour = "black")) +
+  theme(legend.text=element_text(size=14)) +
+  theme(legend.title=element_text(size=16))
+
+
+
+```
+
+\newpage
+
+```{r percentile wrangling}
+
+# PERCENTILES 
+
+# only select one of each group and remove time, this leaves a df where each row is a nightly summary (otherwise the number of passes is repeated for each individual pass)
+df <- All_data %>%
+  dplyr::group_by(location_name, Night, Spp) %>%
+  dplyr::top_n(1) %>%
+  filter(row_number()==1) %>%
+  dplyr::select(-time)
+
+df$location_name <- as.character(df$location_name)
+
+
+recordsum <- ddply(df, c("location_name", "Spp"), summarise, 
+                   surv = length(species))
+wp <- merge(df, recordsum, c("location_name","Spp")) #merge with original dataset - adds surv column onto end of dataset
+
+
+# define some useful variables:
+spn<-length(unique(df$Spp)) # no. of species
+loc<-length(unique(df$location_name)) # no. of detectors
+locs<-length(unique(df$site_name)) # no. of sites, should be 1
+timediff<-as.numeric(difftime(max(df$Night),min(df$Night), units='days')) # time difference in days between earliest and latest date included
+
+#seems to be an issue so adding this in - 03/11/21
+loc <- as.numeric(loc)
+spn <- as.numeric(spn)
+#i <- as.numeric(i)
+
+## the following "n_pages.." variables are used to get a number for how many pages facet_wrap_paginate needs to plot over for certain graphs. Basically work out how many individual graphs there will be, and divide by the number you want per page, and round UP using 'ceiling':
+
+n_pages <- ceiling(nrow(unique(df[,c("species", "location_name")]))/8) # e.g. we have species and location plotted together and we want 8 graphs per page, so how many pages do we need? This will be "n_pages" - this becomes "i" in the 'for' function for facet_wrap_paginate
+
+n_pages1 <- ceiling(nrow(unique(df[,c("species", "location_name")]))/5)
+
+n_pages_sploc <- ceiling(nrow(unique(df[,c("species", "location_name")]))/6)
+
+n_pages_spp <- ceiling(nrow(unique(df[,c("species")]))/6)
+
+n_pages2 <- ceiling(nrow(unique(df[,c("species")]))/4)
+
+n_pages_months <- ceiling(nrow(unique(df[,c("Month")]))/4)
+
+
+```
+
+## PART 1: Percentiles Analysis
+
+This first part of the analysis looks at the relative activity levels of the bats you recorded. We take your value for the total bat passes each night for each species, and compare this to the values in our reference database. We tell you what percentile your data falls at, and therefore what the relative activity level is. For example, if the reference database has values of 5, 10, 15, 20 and you submit a value of 18, this will be the 80th percentile, and be classed as high activity.
+
+The reference range dataset was stratified to include:
+
+`r if('1' %in% df$date_filter) {'* Only records from within 30 days of the survey date.  '}`
+
+`r if('0' %in% df$date_filter) {'* Records from any time of year.  '}`
+
+`r if('200' %in% df$location_filter) {'* Only records from within 200km radius of the survey location.  '}`
+
+`r if('100' %in% df$location_filter) {'* Only records from within 100km radius of the survey location.  '}`
+
+`r if("NO" %in% df$location_filter) {'* Records from across the entire UK.  '}`
+
+`r if("No" %in% df$detector_make_filter) {'* Records using any make of bat detector.  '}`
+
+`r if("Batbox" %in% df$detector_make_filter) {'* Only records using Batbox bat detectors.  '}`
+
+`r if("Ciel" %in% df$detector_make_filter) {'* Only records using Ciel bat detectors.  '}`
+
+`r if("Courtpan" %in% df$detector_make_filter) {'* Only records using Courtpan bat detectors.  '}`
+
+`r if("Elekon" %in% df$detector_make_filter) {'* Only records using Elekon bat detectors.  '}`
+
+`r if("Magenta" %in% df$detector_make_filter) {'* Only records using Magenta bat detectors.  '}`
+
+`r if("Peersonic" %in% df$detector_make_filter) {'* Only records using Peersonic bat detectors.  '}`
+
+`r if("Pettersson" %in% df$detector_make_filter) {'* Only records using Pettersson bat detectors.  '}`
+
+`r if("Titley Scientific" %in% df$detector_make_filter) {'* Only records using Titley Scientific bat detectors.  '}`
+
+`r if("Wildlife Acoustics" %in% df$detector_make_filter) {'* Only records using Wildlife Acoustics bat detectors.  '}`
+
+
+\newpage
+
+## PER DETECTOR
+
+**Table 3.** Summary table showing the number of nights recorded bat activity fell into each activity band for each species.
+```{r summary tables}
+
+
+actdata <- plyr::ddply(df, c("location_name", "species"), summarise,
+                 Night.excep = sum(activity_level == "exceptional"),
+                 Nights.high = sum(activity_level=="high"),
+                 Nights.modhigh = sum(activity_level=="moderate/high"),
+                 Nights.mod = sum(activity_level=="moderate"),
+                 Nights.lowmod = sum(activity_level=="low/moderate"),
+                 Nights.low = sum(activity_level=="low"))
+                  
+
+#rename columns
+names(actdata)[names(actdata)=="location_name"] <- "Detector ID"
+names(actdata)[names(actdata)=="species"] <- "Species/Species Group"
+names(actdata)[names(actdata)=="Nights.excep"] <- "Nights of Exceptional Activity"
+names(actdata)[names(actdata)=="Nights.high"] <- "Nights of High Activity"
+names(actdata)[names(actdata)=="Nights.modhigh"] <- "Nights of Moderate/ High Activity"
+names(actdata)[names(actdata)=="Nights.mod"] <- "Nights of Moderate Activity"
+names(actdata)[names(actdata)=="Nights.lowmod"] <- "Nights of Low/ Moderate Activity"
+names(actdata)[names(actdata)=="Nights.low"] <- "Nights of Low Activity"                  
+
+results='asis'#important to run this as it ensures the raw table output isn't processed further by knitr
+datatable2<-actdata
+emphasize.italics.cols(2) #second column needs to be in italics i.e. species names
+panderOptions("table.split.table", Inf) #don't split table
+pander(datatable2, style = 'rmarkdown', keep.line.breaks=TRUE)
+```
+
+\newpage
+
+**Table 4.** Summary table showing key metrics for each species recorded. The reference range is the number of nights for each species that your data were compared to. We recommend a Reference Range of 200+ to be confident in the relative activity level.
+
+
+```{r confidence intervals}
+
+## can't use confint when only 1 night of surveying, so have to split the data into two, and calculate the confidence intervals separately ##
+
+##################### STEP 1 ####################################
+
+# if the mean no. of survey nights is greater than 2 (ie not all 1) then do the following:
+
+if (mean(wp$surv) >= 2) {
+
+# firstly split into where `surv` (no. of survey nights) is greater than or equal to 2 and use confint to calculate the confidence intervals
+  
+con<-subset(wp, surv>=2) 
+
+# confint code for 95% confidence intervals
+confint<-groupwiseMedian(percentile ~ location_name + Spp, 
+                          data       = con, 
+                          conf       = 0.95, 
+                          R          = 1000,
+                          wilcox =   TRUE, 
+                          bca        = FALSE, 
+                          digits     = 3)
+
+confint <- transform(confint, Wilcox.lower = ifelse(Wilcox.lower == "NaN", Median, Wilcox.lower))
+confint <- transform(confint, Wilcox.upper = ifelse(Wilcox.upper == "NaN", Median, Wilcox.upper))
+
+
+mm<-merge(con, confint) #merge with subsetted dataset to put columns with the confidence intervals on the end
+mm$confint = paste(mm$Wilcox.lower, mm$Wilcox.upper, sep=" - ") #add a new column with CIs merged
+
+
+
+## then we have to subset out where only one survey night and manually enter 0s for the confidence intervals ##
+
+non <- subset(wp,surv=="1")
+
+if(nrow(non)>0) {
+  non$n <- 0 
+  non$Median <- 0
+  non$Wilcox.upper <- 0
+  non$Wilcox.lower <- 0
+  non$confint <- 0
+  }
+
+
+# then join the two datasets back together
+please<-rbind(mm, non) 
+
+
+# wrangle some column names etc:
+
+mdata2 <- plyr::ddply(please, c("location_name", "species"),
+                      summarise, Median.percentile =
+                      ceiling(median(percentile)),
+                      conf = max(confint),
+                      Highest.perc = max(percentile), 
+                      Number.nights = length(date), 
+                      Reference.range.size =
+                        mean(reference_range_size)) 
+
+#same in each row because same species same location
+names(mdata2)[names(mdata2)=="location_name"] <- "Detector ID"
+names(mdata2)[names(mdata2)=="species"] <- "Species/Species Group"
+names(mdata2)[names(mdata2)=="Median.percentile"] <- "Median Percentile"
+names(mdata2)[names(mdata2)=="conf"] <- "95% CIs"
+names(mdata2)[names(mdata2)=="Highest.perc"] <- "Max Percentile"
+names(mdata2)[names(mdata2)=="Number.nights"] <- "Nights Recorded"
+names(mdata2)[names(mdata2)=="Reference.range.size"] <- "Reference Range"
+
+
+
+## create table of confidence intervals ##
+
+results='asis' #important to run this as it ensures the raw table output isn't processed further by knitr
+medtable2<-mdata2
+emphasize.italics.cols(2)
+panderOptions("table.split.table", Inf)
+panderOptions("table.split.cells", Inf)
+pander(medtable2, style = 'multiline', keep.line.breaks=TRUE,justify = c('centre', 'centre', 'centre', 'centre', 'centre', 'centre', 'centre'))
+
+}
+
+##################### STEP 2 ####################################
+
+## however, if all survey nights are 1 (ie a mean of 1) do the following:
+
+if (mean(wp$surv) == 1) {
+  
+#subset dataset to only include records with one night of surveying 
+non<-subset(wp,surv=="1") 
+
+#add empty columns to enable merger
+if(nrow(non)>0) {
+  non$n <- 0 
+  non$Median <- 0
+  non$Wilcox.upper <- 0
+  non$Wilcox.lower <- 0
+  non$confint <- 0}
+
+mdata2 <- plyr::ddply(non, c("location_name", "species"),
+                      summarise,
+                      Median.percentile =
+                        ceiling(median(percentile)),
+                      conf = max(confint),
+                      Highest.perc = max(percentile), 
+                      Number.nights = length(date), 
+                      Reference.range.size =
+                        mean(reference_range_size)) 
+
+
+#same in each row because same species same location
+names(mdata2)[names(mdata2)=="location_name"] <- "Detector ID"
+names(mdata2)[names(mdata2)=="species"] <- "Species/Species Group"
+names(mdata2)[names(mdata2)=="Median.percentile"] <- "Median Percentile"
+names(mdata2)[names(mdata2)=="conf"] <- "95% CIs"
+names(mdata2)[names(mdata2)=="Highest.perc"] <- "Max Percentile"
+names(mdata2)[names(mdata2)=="Number.nights"] <- "Nights Recorded"
+names(mdata2)[names(mdata2)=="Reference.range.size"] <- "Reference Range"
+
+
+## create table of confidence intervals ##
+
+
+results='asis' #important to run this as it ensures the raw table output isn't processed further by knitr
+medtable2<-mdata2
+emphasize.italics.cols(2)
+panderOptions("table.split.table", Inf)
+panderOptions("table.split.cells", Inf)
+pander(medtable2, style = 'multiline', keep.line.breaks=TRUE,justify = c('centre', 'centre', 'centre', 'centre', 'centre', 'centre', 'centre'))
+
+}
+
+```
+
+
+\newpage
+
+### Figures
+
+**Figure 2.** The recorded activity of bats during the survey. The centre line indicates the median activity level whereas the box represents the interquartile range (the spread of the middle 50% of nights of activity)
+
+
+```{r boxplot base}
+
+## this is the ggplot code for the boxplots if there is more than location / detector identity - it's saved as a function so any additions to it in the function that require a specific if statement can be written as:
+
+# box_basplot (df) + xxxx 
+
+## the for statement plots the graphs over multiple pages using facet_grid/wrap_paginate otherwise they're too squashed up. "wrap" will create lots of separate graphs with the header at the top (most frequently used here), "grid" creates a grid of the graphs with the title on the right y axis.
+
+box_baseplot = function (df) {
+  
+      for (i in seq_len(n_pages2)) {
+
+
+print(ggplot(df, aes(x=location_name, y=percentile)) + 
+  geom_hline(aes(yintercept=0), linetype="dashed",
+             color="#000000") +
+  geom_hline(aes(yintercept=20), linetype="dashed",
+             color="#0072B2") +
+  geom_hline(aes(yintercept=40), linetype="dashed",
+             color="#56B4E9") +
+  geom_hline(aes(yintercept=60), linetype="dashed",
+             color="#009E73") +
+  geom_hline(aes(yintercept=80), linetype="dashed",
+             color="#E69F00") +
+  geom_boxplot(df, mapping = aes(fill=location_name)) +
+  xlab("\nDetector ID") +
+  ylab("Activity Level (Percentile)\n") +
+  scale_fill_grey(start = 0.35, end = 1) +
+  scale_x_discrete(drop=FALSE) +
+  scale_y_continuous(breaks=seq(0,100,20), limits=c(0,100)) +
+  expand_limits(y=c(0,100)) +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour="black",
+                                    linetype="solid"),
+        axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid"),
+        axis.title.x=element_text(size=14),
+        axis.text.x  = element_text(angle=90,
+                                    size=12, hjust=1, vjust=0),
+        axis.text.y  = element_text(size=12),
+        axis.line.x = element_line(color="black", size = 0.5),
+        axis.line.y = element_line(color="black", size = 0.5),
+        axis.title.y=element_text(size=14),
+        legend.position="none") +
+  facet_grid_paginate(species ~ ., ncol=1, nrow=4,
+                      scales="fixed", page=i) +
+  theme(strip.text.y = element_text(size=12, face="italic")))
+
+  }
+
+}
+
+
+```
+
+```{r fig.width=9, fig.height=12}
+
+# if there is one location create the first graph
+# else, create the base_boxplot graph from the above function
+
+if(loc=="1") {
+  
+boxplot1 <- ggplot(df, aes(x=Spp, y=percentile)) + 
+  geom_hline(aes(yintercept=0), linetype="dashed",
+             color="#000000") +
+  geom_hline(aes(yintercept=20), linetype="dashed",
+             color="#0072B2") +
+  geom_hline(aes(yintercept=40), linetype="dashed",
+             color="#56B4E9") +
+  geom_hline(aes(yintercept=60), linetype="dashed",
+             color="#009E73") +
+  geom_hline(aes(yintercept=80), linetype="dashed",
+             color="#E69F00") +
+  geom_boxplot(df, mapping = aes(fill=species)) +
+  xlab("\nSpecies") +
+  ylab("Activity Level (Percentile)\n") +
+  scale_fill_grey(start = 0.35, end = 1) +
+  scale_x_discrete(drop=TRUE) +
+  scale_y_continuous(breaks=seq(0,100,20)) +
+  expand_limits(y=c(0,100)) +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype="blank"),
+        axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid"),
+        axis.title.x=element_text(size=14),
+        axis.text.x  = element_text(angle=90, face="italic",
+                                    size=12, hjust=1, vjust=0),
+        axis.text.y  = element_text(size=12),
+        axis.line.x = element_line(color="black", size = 0.5),
+        axis.line.y = element_line(color="black", size = 0.5),
+        axis.title.y=element_text(size=14),
+        legend.position="none")
+boxplot1
+
+} else {
+  
+box_baseplot(df)
+  
+}
+
+```
+
+
+
+```{r night-percentile base plot}
+
+## this is the function that plots out the base plot for the night-percentile graphs. So you just need to enter what the dataframe and breaks are, e.g. graph_baseplot(data, "1 week")
+
+levels(df$activity_level) <- c(levels(df$activity_level), c("exceptional", "high", "moderate/high", "low/moderate", "low", "moderate"))
+
+graph_baseplot = function (df, breaks) {
+  
+graph_base <- ggplot(df, aes(x= Night, y= percentile)) +
+  geom_point(df, size=3, shape=1,
+             mapping = aes(x=Night, y= percentile,
+                           color=activity_level))+
+  ylab("Activity Level (Percentile)\n") +
+  scale_colour_manual(values=cbbPalette, name="Activity\nLevel",
+                      breaks=c("exceptional", "high","moderate/high","moderate",
+                               "low/moderate","low")) +
+  scale_y_continuous(breaks=seq(0,100,20), limits=c(0,100)) + 
+  scale_x_date(name = "\nNight", date_breaks = breaks,
+               date_labels = "%d %b %Y") +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour="black",
+                                    linetype="solid"),
+        axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid"),
+        axis.title.x=element_text(size=14),
+        axis.text.x  = element_text(angle=90,size=12, hjust=1,
+                                    vjust=0),
+        axis.text.y  = element_text(size=12),
+        axis.line.x = element_line(color="black", size = 0.5),
+        axis.line.y = element_line(color="black", size = 0.5),
+        axis.title.y = element_text(size=14)) +
+  geom_hline(aes(yintercept=20), linetype="dashed",
+             color="#0072B2") +
+  geom_hline(aes(yintercept=40), linetype="dashed",
+             color="#56B4E9") +
+  geom_hline(aes(yintercept=60), linetype="dashed",
+             color="#009E73") +
+  geom_hline(aes(yintercept=80), linetype="dashed",
+             color="#E69F00")
+
+return(graph_base)
+  
+}
+
+```
+
+**Figure 3.** The activity level (percentile) of bats recorded across each night of the bat survey.
+
+```{r fig.width=9, fig.height=12}
+
+## timediff less than 21 days - breaks = 3 days
+
+# 1 location, 1 species
+
+if(timediff<=21 & loc=="1" & spn=="1") { 
+  
+  graph_baseplot(df, "3 days") 
+  
+}
+
+
+# 1 location, >1 species
+
+if(timediff<=21 & loc=="1" & spn>1) {
+  
+  for (i in seq_len(n_pages1)) {
+  
+  print(graph_baseplot(df, "3 days") +
+  facet_grid_paginate(species ~ ., ncol=1, nrow=5,
+                      scales="fixed", page=i) +
+  theme(strip.text.y = element_text(size=12, face="italic"))
+  )}
+}  
+
+
+# 1 species and 2-5 locations
+
+if(timediff<=21 & loc>1 & loc<=5 & spn=="1") {
+  
+  graph_baseplot(df, "3 days") +
+  facet_grid(. ~ location_name) +
+  theme(strip.text.x = element_text(size=12))
+}
+
+
+# several graphs that need splitting by location and species
+
+if((timediff<=21 & loc>1 & loc<=5 & spn>1) || (timediff<=21 & loc>5 & spn>1) || (timediff<=21 & loc>5 & spn=="1")) {
+  
+  for (i in seq_len(n_pages)) { 
+    
+  print(graph_baseplot(df, "3 days") +
+  facet_wrap_paginate(species ~ location_name, ncol=2,
+                            nrow=4, scales="fixed",  page=i) +
+  theme(strip.text.x = element_text(size=12, face="italic"),
+        strip.text.y = element_text(size=12)))
+  }
+}
+
+```
+
+
+```{r fig.width=9, fig.height=12}
+
+## timediff is 21-50 days - breaks = 1 week
+
+# 1 location, 1 species
+
+if(timediff>21 & timediff<=50 & loc=="1" & spn=="1"){
+  
+  graph_baseplot(df, "1 week")
+  
+}
+
+
+# 1 location, >1 species
+
+if(timediff>21 & timediff<=50 & loc=="1" & spn>1) { 
+  
+  for (i in seq_len(n_pages1)) {
+  
+  print(graph_baseplot(df, "1 week") +
+  facet_grid_paginate(species ~ ., ncol=1, nrow=5,
+                      scales="fixed", page=i) +
+  theme(strip.text.x = element_text(size=12, face="italic")))
+  }
+}
+
+
+# 1 species and 2-5 locations
+
+if(timediff>21 & timediff<=50 & loc>1 & loc<=5 & spn=="1") { 
+  
+  graph_baseplot(df, "1 week") +
+  facet_grid(. ~ location_name) +
+  theme(strip.text.x = element_text(size=12, face="italic"))
+  
+}
+
+
+# several graphs that need splitting by location and species
+
+if((timediff>21 & timediff<=50 & loc>1 & loc<=5 & spn>1) || (timediff>21 & timediff<=50 & loc>5 & spn>1) || (timediff>21 & timediff<=50 & loc>5 & spn=="1")) {
+  
+  for (i in seq_len(n_pages)) {
+    
+    print(graph_baseplot(df, "1 week") +
+    facet_wrap_paginate(species ~ location_name, ncol=2, nrow=4,
+                        scales="fixed", page=i) +
+    theme(strip.text.x = element_text(size=12, face="italic"),
+          strip.text.y = element_text(size=12)))
+  }
+}
+
+```
+
+
+```{r fig.width=9, fig.height=12}
+
+# timediff 50-300 days - breaks = 3 weeks
+
+# 1 location, 1 species
+
+if(timediff>50 & timediff<=300 & loc=="1" & spn=="1"){ 
+  
+  graph_baseplot(df, "3 weeks")
+
+}
+
+
+# 1 location, >1 species
+
+if(timediff>50 & timediff<=300 & loc=="1" & spn>1) {
+  
+  for (i in seq_len(n_pages1)) {
+  
+  print(graph_baseplot(df, "3 weeks") +
+  facet_grid_paginate(species ~ ., ncol=1, nrow=5,  #PROBLEM LINE!!!!!!! 
+                     scales = "fixed", page=i) +
+  theme(strip.text.x = element_text(size=12, face="italic"))
+    
+) }}
+
+
+# 1 species and 2-5 locations
+
+if(timediff>50 & timediff<=300 & loc>1 & loc<=5 & spn=="1"){   
+  
+  graph_baseplot(df, "3 weeks") +
+  facet_grid(. ~ location_name) +
+  theme(strip.text.x = element_text(size=12))
+}
+
+# several graphs that need splitting by location and species
+
+
+if((timediff>50 & timediff<=300 & loc>1 & loc<=5 & spn>1) || (timediff>50 & timediff<=300 & loc>5 & spn>1) || (timediff>50 & timediff<=300 & loc>5 & spn=="1")) {
+  
+  for (i in seq_len(n_pages)) {
+  
+  print(graph_baseplot(df, "3 weeks") +
+  facet_wrap_paginate(species ~ location_name, ncol=2, nrow=4,
+                      scales="fixed", page=i) +
+  theme(strip.text.x = element_text(size=12, face="italic"),
+        strip.text.y = element_text(size=12))#)
+ )} }
+
+
+
+```
+
+
+```{r fig.width=9, fig.height=12}
+
+
+## if data spans more than a year - breaks = 12 weeks
+
+# 1 location, 1 species
+
+if(timediff>300 & loc=="1" & spn=="1") {  
+  
+  graph_baseplot(df, "12 weeks")
+  
+}
+
+
+# 1 location, >1 species
+
+if(timediff>300 & loc=="1" & spn>1) {
+  
+  for (i in seq_len(n_pages1)) {
+  
+  print(graph_baseplot(df, "12 weeks") +
+  facet_grid_paginate(species ~ ., ncol=1, nrow=5,
+                      scales="fixed", page=i) +
+  theme(strip.text.x = element_text(size=12, face="italic")))
+  }
+}
+
+
+# 1 species and 2-5 locations
+
+if(timediff>300 & loc>1 & loc<=5 & spn=="1") {
+  
+  graph_baseplot(df, "12 weeks") +
+  facet_grid(. ~ location_name) +
+  theme(strip.text.x = element_text(size=12))
+  
+}
+
+
+# several graphs that need splitting by location and species
+
+if((timediff>300 & loc>1 & loc<=5 & spn>1) || (timediff>300 & loc>5 & spn>1) || (timediff>300 & loc>5 & spn=="1")) {
+  
+  for (i in seq_len(n_pages)) {
+  
+    print(graph_baseplot(df, "12 weeks") +
+    facet_wrap_paginate(species ~ location_name, ncol=2, nrow=4,
+                        scales="fixed",  page=i) +
+  theme(strip.text.y = element_text(size=12, face="italic"),
+        strip.text.x = element_text(size=12)))
+  }
+}
+
+```
+
+
+\newpage
+
+## PER DETECTOR, PER MONTH
+
+**Table 5.** Summary table showing the number of nights recorded bat activity fell into each activity band for each species at each detector during each month.
+
+
+```{r}
+
+
+actdata <- plyr::ddply(df, c("location_name", "species", "Month"), summarise,
+                 Nights.exceptional = sum(activity_level=="exceptional"),       
+                 Nights.high = sum(activity_level=="high"),
+                 Nights.modhigh = sum(activity_level=="moderate/high"),
+                 Nights.mod = sum(activity_level=="moderate"),
+                 Nights.lowmod = sum(activity_level=="low/moderate"),
+                 Nights.low = sum(activity_level=="low"))
+
+#rename columns
+names(actdata)[names(actdata)=="location_name"] <- "Detector ID"
+names(actdata)[names(actdata)=="species"] <- "Species/Species Group"
+names(actdata)[names(actdata)=="Nights.exceptional"] <- "Nights of Exceptional Activity"
+names(actdata)[names(actdata)=="Nights.high"] <- "Nights of High Activity"
+names(actdata)[names(actdata)=="Nights.modhigh"] <- "Nights of Moderate/ High Activity"
+names(actdata)[names(actdata)=="Nights.mod"] <- "Nights of Moderate Activity"
+names(actdata)[names(actdata)=="Nights.lowmod"] <- "Nights of Low/ Moderate Activity"
+names(actdata)[names(actdata)=="Nights.low"] <- "Nights of Low Activity"                  
+
+results='asis'#important to run this as it ensures the raw table output isn't processed further by knitr
+datatable2<-actdata
+emphasize.italics.cols(2) #second column needs to be in italics i.e. species names
+panderOptions("table.split.table", Inf) #don't split table
+pander(datatable2, style = 'rmarkdown', keep.line.breaks=TRUE)
+#library(kableExtra)
+#kable(datatable2, "html", table.attr = "style = \"color: black;\"") %>%
+#  kable_styling(full_width = F)
+
+```
+
+\newpage
+
+**Table 6.** Summary table showing key metrics for each species recorded per month. Please note that we cannot split the reference range by month, hence this column is not shown in this table.
+
+
+```{r}
+
+if (mean(wp$surv) >=2) {
+
+con<-subset(wp, surv>=2) #subset dataset to only include records with more than one night of surveying
+confint<-groupwiseMedian(percentile ~ location_name + Spp, #code to get confidence intervals
+                          data       = con, 
+                          conf       = 0.95, 
+                          R          = 1000,
+                          wilcox =   TRUE, 
+                          bca        = FALSE, 
+                          digits     = 3)
+
+confint <- transform(confint, Wilcox.lower = ifelse(Wilcox.lower == "NaN", Median, Wilcox.lower))
+confint <- transform(confint, Wilcox.upper = ifelse(Wilcox.upper == "NaN", Median, Wilcox.upper))
+
+
+mm<-merge(con, confint) #merge with subsetted dataset to put columns with the confidence intervals on the end
+mm$confint = paste(mm$Wilcox.lower, mm$Wilcox.upper, sep=" - ") #add a new column with CIs merged
+
+non<-subset(wp,surv=="1") #subset dataset to only include records with one night of surveying
+if(nrow(non)>0) {
+  non$n <- 0 #add empty columns to enable merger
+non$Median <- 0
+non$Wilcox.upper <- 0
+non$Wilcox.lower <- 0
+non$confint <- 0}
+
+please<-rbind(mm, non) #join the two datasets back together
+
+mdata2 <- plyr::ddply(please, c("location_name", "species", "Month"), summarise,
+               Median.percentile = ceiling(median(percentile)),#finds median percentile
+               conf = max(confint),
+               Highest.perc = max(percentile), #returns max percentiles
+               Number.nights = length(date)) #returns how many nights of data in the dataset
+
+names(mdata2)[names(mdata2)=="location_name"] <- "Detector ID"
+names(mdata2)[names(mdata2)=="species"] <- "Species/Species Group"
+names(mdata2)[names(mdata2)=="Median.percentile"] <- "Median Percentile"
+names(mdata2)[names(mdata2)=="conf"] <- "95% CIs"
+names(mdata2)[names(mdata2)=="Highest.perc"] <- "Max Percentile"
+names(mdata2)[names(mdata2)=="Number.nights"] <- "Nights Recorded"
+
+
+
+results='asis' #important to run this as it ensures the raw table output isn't processed further by knitr
+medtable2<-mdata2
+emphasize.italics.cols(2)
+panderOptions("table.split.table", Inf)
+panderOptions("table.split.cells", Inf)
+pander(medtable2, style = 'multiline', keep.line.breaks=TRUE,justify = c('centre', 'centre', 'centre', 'centre', 'centre', 'centre', 'centre'))
+
+}
+
+if (mean(wp$surv) == 1) {
+  
+non<-subset(wp,surv=="1") #subset dataset to only include records with one night of surveying
+if(nrow(non)>0) {
+  non$n <- 0 #add empty columns to enable merger
+non$Median <- 0
+non$Wilcox.upper <- 0
+non$Wilcox.lower <- 0
+non$confint <- 0}
+
+
+mdata2 <- plyr::ddply(non, c("location_name", "species", "Month"), summarise,
+               Median.percentile = ceiling(median(percentile)),#finds median percentile
+               conf = max(confint),
+               Highest.perc = max(percentile), #returns max percentiles
+               Number.nights = length(date)) #returns how many nights of data in the dataset
+
+names(mdata2)[names(mdata2)=="location_name"] <- "Detector ID"
+names(mdata2)[names(mdata2)=="species"] <- "Species/Species Group"
+names(mdata2)[names(mdata2)=="Median.percentile"] <- "Median Percentile"
+names(mdata2)[names(mdata2)=="conf"] <- "95% CIs"
+names(mdata2)[names(mdata2)=="Highest.perc"] <- "Max Percentile"
+names(mdata2)[names(mdata2)=="Number.nights"] <- "Nights Recorded"
+
+
+results='asis' #important to run this as it ensures the raw table output isn't processed further by knitr
+medtable2<-mdata2
+emphasize.italics.cols(2)
+panderOptions("table.split.table", Inf)
+panderOptions("table.split.cells", Inf)
+pander(medtable2, style = 'multiline', keep.line.breaks=TRUE,justify = c('centre', 'centre', 'centre', 'centre', 'centre', 'centre', 'centre'))
+
+}
+
+
+
+```
+
+\newpage
+
+## PER SITE
+
+**In this 'Per Site' section of the analysis, all values are taken from across all of the detectors to provide site-wide averages/medians.**
+
+
+**Table 7.** Summary table showing the number of nights recorded bat activity fell into each activity band for each species.
+```{r}
+
+
+actdata <- plyr::ddply(df, c("species"), summarise,
+                 Nights.exceptional = sum(activity_level=="exceptional"),       
+                 Nights.high = sum(activity_level=="high"),
+                 Nights.modhigh = sum(activity_level=="moderate/high"),
+                 Nights.mod = sum(activity_level=="moderate"),
+                 Nights.lowmod = sum(activity_level=="low/moderate"),
+                 Nights.low = sum(activity_level=="low"))
+
+#rename columns
+names(actdata)[names(actdata)=="species"] <- "Species/Species Group"
+names(actdata)[names(actdata)=="Nights.exceptional"] <- "Nights of Exceptional Activity"
+names(actdata)[names(actdata)=="Nights.high"] <- "Nights of High Activity"
+names(actdata)[names(actdata)=="Nights.modhigh"] <- "Nights of Moderate/ High Activity"
+names(actdata)[names(actdata)=="Nights.mod"] <- "Nights of Moderate Activity"
+names(actdata)[names(actdata)=="Nights.lowmod"] <- "Nights of Low/ Moderate Activity"
+names(actdata)[names(actdata)=="Nights.low"] <- "Nights of Low Activity"                  
+
+results='asis'#important to run this as it ensures the raw table output isn't processed further by knitr
+datatable2<-actdata
+emphasize.italics.cols(1) #second column needs to be in italics i.e. species names
+panderOptions("table.split.table", Inf) #don't split table
+pander(datatable2, style = 'rmarkdown', keep.line.breaks=TRUE)
+```
+
+\newpage
+
+**Table 8.** Summary table showing key metrics for each species recorded.
+
+
+```{r}
+
+if (mean(wp$surv) >= 2) {
+
+con<-subset(wp, surv>=2) #subset dataset to only include records with more than one night of surveying
+confint<-groupwiseMedian(percentile ~ location_name + Spp, #code to get confidence intervals
+                          data       = con, 
+                          conf       = 0.95, 
+                          R          = 1000,
+                          wilcox =   TRUE, 
+                          bca        = FALSE, 
+                          digits     = 3)
+
+confint <- transform(confint, Wilcox.lower = ifelse(Wilcox.lower == "NaN", Median, Wilcox.lower))
+confint <- transform(confint, Wilcox.upper = ifelse(Wilcox.upper == "NaN", Median, Wilcox.upper))
+
+
+mm<-merge(con, confint) #merge with subsetted dataset to put columns with the confidence intervals on the end
+mm$confint = paste(mm$Wilcox.lower, mm$Wilcox.upper, sep=" - ") #add a new column with CIs merged
+
+non<-subset(wp,surv=="1") #subset dataset to only include records with one night of surveying
+if(nrow(non)>0) {
+  non$n <- 0 #add empty columns to enable merger
+non$Median <- 0
+non$Wilcox.upper <- 0
+non$Wilcox.lower <- 0
+non$confint <- 0}
+
+please<-rbind(mm, non) #join the two datasets back together
+
+mdata2 <- plyr::ddply(please, c("species"), summarise,
+               Median.percentile = ceiling(median(percentile)),#finds median percentile
+               conf = max(confint),
+               Highest.perc = max(percentile), #returns max percentiles
+               Number.nights = length(date)) #returns how many nights of data in the dataset
+
+names(mdata2)[names(mdata2)=="species"] <- "Species/Species Group"
+names(mdata2)[names(mdata2)=="Median.percentile"] <- "Median Percentile"
+names(mdata2)[names(mdata2)=="conf"] <- "95% CIs"
+names(mdata2)[names(mdata2)=="Highest.perc"] <- "Max Percentile"
+names(mdata2)[names(mdata2)=="Number.nights"] <- "Nights Recorded"
+
+
+results='asis' #important to run this as it ensures the raw table output isn't processed further by knitr
+medtable2<-mdata2
+emphasize.italics.cols(1)
+panderOptions("table.split.table", Inf)
+panderOptions("table.split.cells", Inf)
+pander(medtable2, style = 'multiline', keep.line.breaks=TRUE,justify = c('centre', 'centre', 'centre', 'centre', 'centre'))
+}
+
+
+if (mean(wp$surv) == 1) {
+
+  non<-subset(wp,surv=="1") #subset dataset to only include records with one night of surveying
+if(nrow(non)>0) {
+  non$n <- 0 #add empty columns to enable merger
+non$Median <- 0
+non$Wilcox.upper <- 0
+non$Wilcox.lower <- 0
+non$confint <- 0}
+
+
+mdata2 <- plyr::ddply(non, c("species"), summarise,
+               Median.percentile = ceiling(median(percentile)),#finds median percentile
+               conf = max(confint),
+               Highest.perc = max(percentile), #returns max percentiles
+               Number.nights = length(date)) #returns how many nights of data in the dataset
+ 
+names(mdata2)[names(mdata2)=="species"] <- "Species/Species Group"
+names(mdata2)[names(mdata2)=="Median.percentile"] <- "Median Percentile"
+names(mdata2)[names(mdata2)=="conf"] <- "95% CIs"
+names(mdata2)[names(mdata2)=="Highest.perc"] <- "Max Percentile"
+names(mdata2)[names(mdata2)=="Number.nights"] <- "Nights Recorded"
+
+
+results='asis' #important to run this as it ensures the raw table output isn't processed further by knitr
+medtable2<-mdata2
+emphasize.italics.cols(1)
+panderOptions("table.split.table", Inf)
+panderOptions("table.split.cells", Inf)
+pander(medtable2, style = 'multiline', keep.line.breaks=TRUE,justify = c('centre', 'centre', 'centre', 'centre', 'centre'))
+  
+}
+
+```
+
+\newpage
+
+### Figures
+
+**Figure 4.** The activity level (percentile) of bats recorded across each night of the bat survey for the **entire site**.
+
+
+```{r fig.width=9, fig.height=6}
+
+#boxplot if 1 location
+
+graphbox<-ggplot(df, aes(x=Spp, y=percentile)) + 
+  geom_hline(aes(yintercept=0), linetype="dashed",
+             color="#000000") +
+  geom_hline(aes(yintercept=20), linetype="dashed",
+             color="#0072B2") +
+  geom_hline(aes(yintercept=40), linetype="dashed",
+             color="#56B4E9") +
+  geom_hline(aes(yintercept=60), linetype="dashed",
+             color="#009E73") +
+  geom_hline(aes(yintercept=80), linetype="dashed",
+             color="#E69F00") +
+  geom_boxplot(df, mapping = aes(fill=species))+
+  xlab("\nSpecies")+
+  ylab("Bat Activity Level (Percentile)\n")+
+  scale_fill_grey(start = 0.35, end = 1)+
+  scale_x_discrete(drop=TRUE) +
+  scale_y_continuous(breaks=seq(0,100,20)) +
+  expand_limits(y=c(0,100))+
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype="blank"),
+        axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid"),
+        axis.title.x=element_text(size=18),
+        axis.text.x  = element_text(angle=90, face="italic",
+                                    size=14, hjust=1, vjust=0),
+        axis.text.y  = element_text(size=12),
+        axis.line.x = element_line(color="black", size = 0.5),
+        axis.line.y = element_line(color="black", size = 0.5),
+        axis.title.y=element_text(size=16),
+        legend.position="none")
+graphbox
+
+```
+
+
+```{r median medians}
+
+# get the site-wide medians
+
+df$percentiles <- as.numeric(df$percentile)
+
+medians <- df %>%
+  dplyr::select(location_name, Night, Spp, percentiles,
+                activity_level, species) %>%
+  dplyr::group_by(Night, Spp) %>%
+  dplyr::mutate(med = median(percentiles)) %>%
+  dplyr::arrange(Night)
+
+
+```
+
+\newpage
+
+**Figure 5.** The median activity levels of bats recorded across all detectors each night.
+
+```{r medians base plot}
+
+## baseplot for medians across all detectors
+
+#levels(medians$activity_level) <- c(levels(df$activity_level), c("exceptional", "high", "moderate/high", "low/moderate", "low", "moderate", "exceptional"))
+
+median_baseplot <- function (df, breaks) {
+  
+  graph_medians <- ggplot(medians, aes(x = Night, 
+                                       y = (median(med)))) +
+  geom_point(medians, size=3, shape=1,
+             mapping = aes(x=Night, y= med,
+                           color=activity_level))+
+  ylab("Median Bat Activity Level\n")+
+  scale_colour_manual(values=cbbPalette, name="Activity\nLevel",
+                      breaks=c("exceptional", "high","moderate/high","moderate",
+                               "low/moderate","low"))+
+  scale_y_continuous(breaks=seq(0,100,20), limits=c(0,100)) + 
+  scale_x_date(name = "\nDate", date_breaks = breaks, 
+               date_labels = "%d %b %Y")+
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour="black",
+                                    linetype="solid"),
+        axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid"),
+        axis.title.x=element_text(size=14),
+        axis.text.x  = element_text(angle=90,size=12, 
+                                    hjust=1, vjust=0),
+        axis.text.y  = element_text(size=12),
+        axis.line.x = element_line(color="black", size = 0.5),
+        axis.line.y = element_line(color="black", size = 0.5),
+        axis.title.y=element_text(size=14)) +
+  geom_hline(aes(yintercept=20), linetype="dashed",
+             color="#0072B2") +
+  geom_hline(aes(yintercept=40), linetype="dashed",
+             color="#56B4E9") +
+  geom_hline(aes(yintercept=60), linetype="dashed",
+             color="#009E73") +
+  geom_hline(aes(yintercept=80), linetype="dashed",
+             color="#E69F00")
+  
+return(graph_medians)
+  
+}
+
+
+```
+
+
+```{r fig.width=9, fig.height=10}
+
+## if time difference less than 21 days - breaks = 3 days
+
+# 1 location, 1 species
+
+if(timediff<=21 & locs=="1" & spn=="1") {
+  
+    median_baseplot(medians, "3 days") 
+  
+}
+
+
+# 1 location, >1 species
+
+if(timediff<=21 & locs=="1" & spn>1) {
+  
+  for (i in seq_len(n_pages2)) {
+  
+  print(median_baseplot(medians, "3 days") +
+        facet_grid_paginate(species ~ ., ncol=1, nrow=4,
+                            scales="fixed", page=i) +
+        theme(strip.text.y = element_text(size=12,
+                                          face="italic")))
+  }
+}  
+
+```
+
+
+```{r fig.width=9, fig.height=10}
+
+## if time difference is between 21 and 50 days - breaks = 1 week
+
+# 1 location, 1 species
+
+if(timediff>21 & timediff<50 & locs=="1" & spn=="1") {
+  
+      median_baseplot(medians, "1 week") 
+}
+
+
+# 1 location, >1 species
+
+if(timediff>21 & timediff<50 & locs=="1" & spn>1) { 
+  
+  for (i in seq_len(n_pages2)) {
+  
+  print(median_baseplot(medians, "1 week")  +
+        facet_grid_paginate(species ~ ., ncol=1, nrow=4,
+                            scales="fixed", page=i) +
+        theme(strip.text.y = element_text(size=12,
+                                          face="italic")))
+  }
+}
+
+```
+
+
+```{r fig.width=9, fig.height=10}
+
+# if time diff between 50 and 300 days - breaks = 3 weeks
+
+# 1 location, 1 species
+
+if(timediff>50 & timediff<300 & locs=="1" & spn=="1") { 
+  
+  median_baseplot(medians, "3 weeks") 
+
+}
+
+
+# 1 location, >1 species
+
+if(timediff>50 & timediff<300 & locs=="1" & spn>1) {
+  
+  for (i in seq_len(n_pages2)) {
+  
+  print(median_baseplot(medians, "3 weeks") +
+        facet_grid_paginate(species ~ ., ncol=1, nrow=4,
+                            scales="fixed", page=i) +
+        theme(strip.text.y = element_text(size=12,
+                                          face="italic")))
+ }
+}
+
+```
+
+
+```{r fig.width=9, fig.height=10}
+
+# if data spans more than a year - breaks - 12 weeks
+
+# 1 location, 1 species
+
+if(timediff>=300 & locs=="1" & spn=="1"){
+  
+  median_baseplot(medians, "12 weeks")
+   
+}
+
+
+# 1 location, >1 species
+
+if(timediff>=300 & locs=="1" & spn>1) {
+  
+  for (i in seq_len(n_pages2)) {
+  
+  print(median_baseplot(medians, "12 weeks") +
+        facet_grid_paginate(species ~ ., ncol=1, nrow=4,
+                            scales="fixed", page=i) +
+        theme(strip.text.y = element_text(size=12,
+                                          face="italic")))
+  }
+}
+
+```
+
+
+\newpage
+
+## PER SITE, PER MONTH
+
+**Table 9.** Summary table showing the number of nights recorded bat activity fell into each activity band for each species during each month.
+```{r}
+
+actdata <- plyr::ddply(df, c("species", "Month"), summarise,
+                 Nights.exceptional = sum(activity_level=="exceptional"),
+                 Nights.high = sum(activity_level=="high"),
+                 Nights.modhigh = sum(activity_level=="moderate/high"),
+                 Nights.mod = sum(activity_level=="moderate"),
+                 Nights.lowmod = sum(activity_level=="low/moderate"),
+                 Nights.low = sum(activity_level=="low"))
+
+#rename columns
+names(actdata)[names(actdata)=="species"] <- "Species/Species Group"
+names(actdata)[names(actdata)=="Nights.exceptional"] <- "Nights of Exceptional Activity"
+names(actdata)[names(actdata)=="Nights.high"] <- "Nights of High Activity"
+names(actdata)[names(actdata)=="Nights.modhigh"] <- "Nights of Moderate/ High Activity"
+names(actdata)[names(actdata)=="Nights.mod"] <- "Nights of Moderate Activity"
+names(actdata)[names(actdata)=="Nights.lowmod"] <- "Nights of Low/ Moderate Activity"
+names(actdata)[names(actdata)=="Nights.low"] <- "Nights of Low Activity"                  
+
+results='asis'#important to run this as it ensures the raw table output isn't processed further by knitr
+datatable2<-actdata
+emphasize.italics.cols(1) #second column needs to be in italics i.e. species names
+panderOptions("table.split.table", Inf) #don't split table
+pander(datatable2, style = 'rmarkdown', keep.line.breaks=TRUE) 
+  
+
+```
+
+\newpage
+
+**Table 10.** Summary table showing key metrics for each species recorded per month. 
+```{r}
+
+if (mean(wp$surv) >= 2) {
+
+con<-subset(wp, surv>=2) #subset dataset to only include records with more than one night of surveying
+confint<-groupwiseMedian(percentile ~ location_name + Spp, #code to get confidence intervals
+                          data       = con, 
+                          conf       = 0.95, 
+                          R          = 1000,
+                          wilcox =   TRUE, 
+                          bca        = FALSE, 
+                          digits     = 3)
+
+confint <- transform(confint, Wilcox.lower = ifelse(Wilcox.lower == "NaN", Median, Wilcox.lower))
+confint <- transform(confint, Wilcox.upper = ifelse(Wilcox.upper == "NaN", Median, Wilcox.upper))
+
+
+mm<-merge(con, confint) #merge with subsetted dataset to put columns with the confidence intervals on the end
+mm$confint = paste(mm$Wilcox.lower, mm$Wilcox.upper, sep=" - ") #add a new column with CIs merged
+
+non<-subset(wp,surv=="1") #subset dataset to only include records with one night of surveying
+if(nrow(non)>0) {
+  non$n <- 0 #add empty columns to enable merger
+non$Median <- 0
+non$Wilcox.upper <- 0
+non$Wilcox.lower <- 0
+non$confint <- 0}
+
+please<-rbind(mm, non) #join the two datasets back together
+
+mdata2 <- plyr::ddply(please, c("species", "Month"), summarise,
+               Median.percentile = ceiling(median(percentile)),#finds median percentile
+               conf = max(confint),
+               Highest.perc = max(percentile), #returns max percentiles
+               Number.nights = length(date)) #returns how many nights of data in the dataset
+
+names(mdata2)[names(mdata2)=="species"] <- "Species/Species Group"
+names(mdata2)[names(mdata2)=="Median.percentile"] <- "Median Percentile"
+names(mdata2)[names(mdata2)=="conf"] <- "95% CIs"
+names(mdata2)[names(mdata2)=="Highest.perc"] <- "Max Percentile"
+names(mdata2)[names(mdata2)=="Number.nights"] <- "Nights Recorded"
+names(mdata2)[names(mdata2)=="Reference.range.size"] <- "Reference Range"
+
+
+results='asis' #important to run this as it ensures the raw table output isn't processed further by knitr
+medtable2<-mdata2
+emphasize.italics.cols(1)
+panderOptions("table.split.table", Inf)
+panderOptions("table.split.cells", Inf)
+pander(medtable2, style = 'multiline', keep.line.breaks=TRUE,justify = c('centre', 'centre', 'centre', 'centre', 'centre', 'centre'))
+
+}
+
+
+if (mean(wp$surv) ==1) {
+  
+  non<-subset(wp,surv=="1") #subset dataset to only include records with one night of surveying
+if(nrow(non)>0) {
+  non$n <- 0 #add empty columns to enable merger
+non$Median <- 0
+non$Wilcox.upper <- 0
+non$Wilcox.lower <- 0
+non$confint <- 0}
+
+mdata2 <- plyr::ddply(non, c("species", "Month"), summarise,
+               Median.percentile = ceiling(median(percentile)),#finds median percentile
+               conf = max(confint),
+               Highest.perc = max(percentile), #returns max percentiles
+               Number.nights = length(date)) #returns how many nights of data in the dataset
+
+names(mdata2)[names(mdata2)=="species"] <- "Species/Species Group"
+names(mdata2)[names(mdata2)=="Median.percentile"] <- "Median Percentile"
+names(mdata2)[names(mdata2)=="conf"] <- "95% CIs"
+names(mdata2)[names(mdata2)=="Highest.perc"] <- "Max Percentile"
+names(mdata2)[names(mdata2)=="Number.nights"] <- "Nights Recorded"
+
+
+
+results='asis' #important to run this as it ensures the raw table output isn't processed further by knitr
+medtable2<-mdata2
+emphasize.italics.cols(1)
+panderOptions("table.split.table", Inf)
+panderOptions("table.split.cells", Inf)
+pander(medtable2, style = 'multiline', keep.line.breaks=TRUE,justify = c('centre', 'centre', 'centre', 'centre', 'centre', 'centre'))
+
+}
+
+```
+
+\newpage
+
+### Figures
+
+**Figure 6.** The activity level (percentile) of bats recorded across each night of the bat survey for the entire site, split between months.
+
+
+```{r fig.width=9, fig.height=10}
+
+  for (i in seq_len(n_pages_months)){
+    
+  print(ggplot(df, aes(x=Spp, y=percentile)) + 
+  geom_hline(aes(yintercept=0), linetype="dashed",
+             color="#000000") +
+  geom_hline(aes(yintercept=20), linetype="dashed",
+             color="#0072B2") +
+  geom_hline(aes(yintercept=40), linetype="dashed",
+             color="#56B4E9") +
+  geom_hline(aes(yintercept=60), linetype="dashed",
+             color="#009E73") +
+  geom_hline(aes(yintercept=80), linetype="dashed",
+             color="#E69F00") +
+  geom_boxplot(df, mapping = aes(fill=species)) +
+  xlab("\nSpecies")+
+  ylab("Bat Activity Level (Percentile)\n")+
+  scale_fill_grey(start = 0.35, end = 1)+
+  scale_x_discrete(drop=TRUE) +
+  scale_y_continuous(breaks=seq(0,100,20)) +
+  expand_limits(y=c(0,100))+
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour="black",
+                                    linetype="solid"),
+        axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid"),
+        axis.title.x=element_text(size=14),
+        axis.text.x  = element_text(angle=90, face="italic",
+                                    size=12, hjust=1, vjust=0),
+        axis.text.y  = element_text(size=12),
+        axis.line.x = element_line(color="black", size = 0.5),
+        axis.line.y = element_line(color="black", size = 0.5),
+        axis.title.y=element_text(size=14),
+        legend.position="none") +
+  facet_grid_paginate(Month ~ ., ncol=1, nrow=4,
+                      scales="fixed", page=i) +
+  theme(strip.text.y = element_text(size=12, face="italic")))
+      
+}
+
+```
+
+
+\newpage
+
+## PART 2: Nightly Analysis
+
+
+```{r infer zeros}
+
+## in this bit of code we have to 'infer zeros' on nights when some species were recorded but not others. So spread the data out and include 0s where NAs. Just run through each line one at a time if you need to understand better what's happening here.
+
+df_spr <- df %>%
+  dplyr::select(location_name, lat, lon, Night, Spp,
+                passes.per.hour) %>%
+  spread(Spp, passes.per.hour)
+
+df_gath <- df_spr %>%
+  gather(Spp, passes.per.hour, 5:(length(Spp_list)+4)) %>% #the 3 was previously a 4, see what happens
+  replace(is.na(.), 0) %>%
+  arrange(location_name, Night, Spp)
+
+
+df_z <- df_gath %>%
+  mutate(Month = lubridate::month(Night, label = T)) 
+
+df_z2 <- dplyr::left_join(df_z, russ, by = "Spp")
+
+df_passes <- df %>%
+  select(Spp, Night, location_name, passes)
+
+df_z3 <- dplyr::left_join(df_z2, df_passes, 
+                          by = c("Night", "location_name", 
+                                 "Spp")) 
+
+df_zero <- df_z3 %>%
+  replace(is.na(.), 0)
+
+df_zero$Month <- as.character(df_zero$Month)
+
+```
+ 
+
+# ENTIRE SURVEY PERIOD
+
+## Sunrise and Sunset Times  
+**Table 11. The times of sunset and sunrise the following morning for surveys beginning on the date shown.**
+
+```{r}
+
+Table <- All_data %>% 
+  select(Night, sunset, sunrise) %>% 
+  distinct() %>% 
+  mutate(night_length = round(as.numeric(difftime(sunrise, sunset, units='hours')), digits = 1),
+         sunset = stringr::str_sub(as.character(sunset), 11, 16),
+         sunrise = stringr::str_sub(as.character(sunrise), 11, 16)) %>%
+  arrange(Night)
+
+colnames(Table) <- c("Night (y-m-d)", "Sunset (hh:mm)", "Sunrise (hh:mm)", "Night Length (hours)")
+
+
+knitr::kable(Table, align = "cccc")
+
+```
+
+\newpage
+
+# Distribution of Bat Activity Across the Night through Time
+## Per Detector
+
+**Figure 7.** Timing of bat calls plotted as minutes before/after sunset, whereby 0 on the y axis represents sunset. Sunrise throughout the survey period is depicted as the red dashed line. Colours indicate kernel densities, with darkest colours showing peaks of activity. These colours are comparative only within each plot, and do not account for overall activity.
+
+```{r, fig.width=10, fig.height=12}
+
+sun_data <- na.omit(sun_data)
+
+for (i in seq_len(n_pages_sploc)) {
+
+  print(ggplot(All_data, aes(Night, post_set_min)) +
+ # stat_density2d(aes(alpha = ..level.., fill =..level..),  #take out yellow blobs, error here: https://stackoverflow.com/questions/53075331/error-using-geom-density-2d-in-r-computation-failed-in-stat-density2d-b
+               #  geom="polygon") + 
+  #scale_fill_gradient(low = "yellow", high = "red") +
+  geom_point(size=2, alpha = 0.5) +
+  geom_line(data = sun_data, aes(Night, night_length_min),
+            linetype = "dashed", colour = "red") +
+  xlab("\nDate") + 
+  ylab("Minutes after sunset\n") +
+  theme_bw() +
+  theme(legend.position = "none") +
+  theme(axis.title.y = element_text(colour="black", size=18,
+                                     face="bold")) +
+  theme(axis.title.x = element_text(colour="black", size=18,
+                                     face="bold")) +
+  theme(strip.text.x = element_text(size=18, face="bold")) +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour="black",
+                                    linetype="solid"),
+        axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid")) +
+  theme(axis.text.x = element_text(angle=90, size=16, hjust=1,
+                                   vjust=0.5,
+                                   colour = "black")) +
+  theme(axis.text.y = element_text(size = 16, 
+                                   colour = "black")) +
+  facet_wrap_paginate(species ~location_name, ncol=2, nrow=3,
+                      scales="fixed", page=i) +
+    theme(strip.text.x = element_text(size=12,
+                                      face="italic")))
+}
+
+```
+
+
+\newpage
+
+# Roost Emergence Time and Bat Observation
+
+Based on: _Russ, Jon. 2012. British Bat Calls a Guide to species Identification._ 
+_Pelagic Publishing._
+
+For more information see <https://rbats-blog.updog.co/2018/05/29/bat-emergence/>
+
+
+
+## Bat Passes Potentially Indicating Close Proximity to a Roost (Russ 2012) - Table
+
+**Table 12. Number of bat calls recorded before the upper time of the species-specific emergence time range, and which therefore may potentially indicate the presence of a nearby roost.**
+
+```{r}
+
+
+Table <- All_data %>% 
+  dplyr::filter(post_set_min <= upper) %>% 
+  dplyr::group_by(Night, Spp, location_name) %>% 
+  dplyr::count() %>%
+  spread(Night, n) %>%
+  dplyr::arrange(Spp, location_name) %>%
+  dplyr::rename("Detector ID" = location_name) %>%
+  dplyr::rename("Species" = Spp)
+
+# Make all NA's = 0
+Table[is.na(Table)] <- 0
+
+# simple table
+
+    results='asis' 
+    panderOptions('table.split.table', 100)
+    pander(Table, style = "multiline", justify = "left")
+
+```
+
+\newpage
+
+### Bat Passes Potentially Indicating Close Proximity to a Roost (Russ 2012) - Figures
+
+**Figure 8.** Time from 15 minutes before to 90 minutes after sunset. Species-specific emergence time ranges are shown as grey bars. Bat passes overlapping species-specific grey bars, or occuring earlier than this time range, may potentially indicate the presence of a nearby roost.
+
+
+```{r fig.width=22, fig.height=15}
+
+
+for (i in seq_len(length(unique(All_data$location_name)))) {
+  
+print(ggplot(All_data, aes(x=post_set_min, y=Spp, colour=Spp)) +
+    geom_segment(aes(x=lower, xend=upper, y=Spp, yend=Spp),
+                 size = 25, colour="grey") +
+  geom_point(size=5, alpha=0.7,  position = position_jitter(height = 0.3)) +
+  xlab("\nTime after sunset (mins)") +
+  scale_x_continuous(breaks=c(-15, 0, 15, 30, 45, 60, 75, 90),
+                     limits = c(-15, 90)) +
+  geom_hline(yintercept = c(seq_len(length(Spp_list)-1) + 0.5),
+             colour = "black", linetype = "dotted") +
+  scale_y_discrete(drop=TRUE) +
+  scale_colour_brewer(palette = "Paired") +
+  theme_bw() +
+  theme(legend.position = "none") +
+  theme(plot.caption = element_text(colour = "black", size = 34)) +
+  theme(strip.text.x = element_text(size=34, face="bold")) +
+  theme(axis.title.y = element_blank()) +
+  theme(axis.title.x = element_text(colour = "black", size = 34,
+                                     face = "bold")) +
+  theme(axis.text.x = element_text(size = 28, hjust=0.5, vjust=1,
+                                   colour = "black",
+                                   face = "bold")) +
+  theme(axis.text.y = element_text(size = 28, colour = "black",
+                                   face = "bold")) +
+  theme(panel.background = element_rect(fill = "white")) +
+  theme(panel.grid.major.x = element_line(colour = "black",
+                                          linetype = "dotted"), 
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_blank(), 
+        panel.grid.minor.y = element_blank()) +
+  theme(axis.ticks = element_blank()) +
+  facet_wrap_paginate(~location_name, ncol=1, nrow=1, page=i))
+}
+
+
+
+
+```
+
+
+```{r}
+
+
+#### MATERNITY PERIOD ####
+
+# need to repeat the above tables/graphs for the maternity period (15th June - 30th July) - but only if the survey was conducted over these days, so first we need to see if these dates are included in the data:
+
+# add a column for Day-Month to be used to see if maternity period is included or not
+# ADDS CURRENT YEAR AS YEAR SO NEEDS CHANGING IN GGPLOT CODE BELOW AT THE TURN OF EACH NEW YEAR
+All_data$month <- lubridate::month(All_data$Night)
+All_data$nday <- lubridate::day(All_data$Night)
+All_data$Day <- as.Date(paste(All_data$nday, All_data$month, sep = "-"), format = "%d-%m") #misses year so puts the current year in
+
+# create a vector of dates that fall within the maternity period
+# remember to change the year to 2021 in the new year!!
+matern_days <- seq(as.Date("2021-06-15"), as.Date("2021-07-30"), by="days")
+
+```
+
+`r if (any(matern_days %in% All_data$Day)) {'##### Page Break\n### Bat Passes Potentially Indicating Close Proximity to a Roost (Maternity Period Only)\n **Table 13:** \n *Maternity period defined as 15th June - 30th July.*' }`
+
+```{r}
+
+
+# then we can say, if any of the maternity dates feature in the Day column of the dataframe, then we have data from within the maternity period so make a new table and graphs, if not, give a message there's no data within this period
+
+if (any(matern_days %in% All_data$Day)) {
+  
+  Maternity <- All_data %>%
+  dplyr::filter(Day >= "2020-06-15" & Day <= "2020-07-30") %>%
+  dplyr::filter(post_set_min <= upper) %>%
+  dplyr::group_by(Night, Spp, location_name) %>%
+  dplyr::count() %>%
+  spread(Night, n) %>%
+  dplyr::arrange(Spp, location_name) %>%
+  dplyr::rename("Detector ID" = location_name) %>%
+  dplyr::rename("Species" = Spp) %>%
+  replace(is.na(.), 0)
+  
+}
+
+
+if (exists("Maternity") == TRUE){
+  if (any(is.na(Maternity$Species)) == FALSE) {
+ 
+    results='asis' 
+    panderOptions('table.split.table', 100)
+    pander(Maternity, style = "multiline", justify = "left")
+  
+  } 
+}
+
+
+```
+`r if (exists("Maternity") == TRUE) {if (any(is.na(Maternity$Species)) == TRUE) {'During the maternity period, no bat calls were detected at a time that would indicate proximity to a roost. Please see the figures below for a visual representation.'}}`
+
+`r if (any(matern_days %in% All_data$Day)) {'##### Page Break\n### Bat Passes Potentially Indicating Close Proximity to a Roost (Maternity Period Only)\n **Figure 9.** *Maternity period defined as 15th June - 30th July.*' }`
+
+```{r fig.width=22, fig.height=15}
+
+
+#NEEDS CHANGING EACH YEAR - so add 2020 on 01/01/2020 and 2021 on 01/01/2021 etc (due to the code 2 chunks above)
+matern_data <- All_data %>%
+    dplyr::filter(Day >= "2020-06-15" & Day <= "2020-07-30")
+
+
+if (any(matern_days %in% All_data$Day)) {
+
+for (i in seq_len(length(unique(matern_data$location_name)))) {
+
+ print(matern_data %>%
+    ggplot(aes(x=post_set_min, y=Spp, colour=Spp)) +
+    geom_segment(aes(x=lower, xend=upper, y=Spp, yend=Spp),
+                 size = 25, colour="grey") +
+  geom_point(size=5, alpha=0.7,  
+             position = position_jitter(height = 0.3)) +
+  xlab("\nTime after sunset (mins)") +
+  scale_x_continuous(breaks=c(-15, 0, 15, 30, 45, 60, 75, 90),
+                     limits = c(-15, 90)) +
+  geom_hline(yintercept = c(seq_len(length(Spp_list)-1) + 0.5),
+             colour = "black", linetype = "dotted") +
+  scale_y_discrete(drop=TRUE) +
+  scale_colour_brewer(palette = "Paired") +
+  theme_bw() +
+  theme(legend.position = "none") +
+  theme(plot.caption = element_text(colour = "black", 
+                                    size = 34)) +
+  theme(strip.text.x = element_text(size=34, face="bold")) +
+  theme(axis.title.y = element_blank()) +
+  theme(axis.title.x = element_text(colour = "black", size = 34,
+                                     face = "bold")) +
+  theme(axis.text.x = element_text(size = 28, hjust=0.5, vjust=1,
+                                   colour = "black",
+                                   face = "bold")) +
+  theme(axis.text.y = element_text(size = 28, colour = "black",
+                                   face = "bold")) +
+  theme(panel.background = element_rect(fill = "white")) +
+  theme(panel.grid.major.x = element_line(colour = "black",
+                                          linetype = "dotted"),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank()) +
+  theme (axis.ticks = element_blank()) +
+  facet_wrap_paginate(~location_name, nrow=1, ncol=1, page=i))
+}
+
+}
+
+
+```
+
+
+\newpage
+
+# Counts of Bat Passes
+## All detectors
+
+**Table 14. The total number of passes recorded for each species across all of the detectors.**
+The 'Total' percentage may not be exactly 100% due to rounding of the percentages per species.
+
+```{r}
+
+# Aggregate data into species and count
+
+Table <- df %>%
+  dplyr::group_by(Spp) %>% 
+  dplyr::summarise(passes = sum(passes)) %>%
+  dplyr::mutate(Percentage = round((passes / sum(passes) *100),
+                                   digits = 1)) %>%
+  adorn_totals("row")
+
+
+#Change column Names so more meaningful  
+colnames(Table) <- c("Species", "Passes (No.)",
+                     "Percentage of total (%)")
+
+# kable is a simple table generator
+knitr::kable(Table, align = "lcc")
+
+
+```
+
+
+`r if(length(Dets)>1) {'##### Page Break\n# Counts of Bat Passes\n## Per Detector\n **Table 15. The number of passes recorded for each species at each detector.**\n\n' }`
+
+
+```{r}
+
+# Aggregate data into species and count
+
+if(length(Dets) >1) {
+
+
+# TO CREATE A TABLE WITH LOCATION AS A COLUMN
+Table <- df %>%
+  dplyr::select(Spp, location_name, passes) %>%
+  dplyr::group_by(Spp, location_name) %>%
+  dplyr::summarise(n = sum(passes)) %>%
+  dplyr::ungroup() %>%
+  dplyr::group_by(location_name) %>%
+  dplyr::mutate(Percentage = round((n / sum(n) *100), digits = 1)) 
+
+
+#Change column Names so more meaningful  
+colnames(Table) <- c("Species", "Detector ID", "Count (No)", "Percentage by Detector (%)")
+
+# kable is a simple table generator
+knitr::kable(Table, align = 'lccc')
+}
+
+```
+
+\newpage
+
+# Species Composition 
+
+**Figure 10.** Percentage species composition of passes at each detector.
+
+
+```{r fig.height=8, fig.width=10}
+
+# stacked bar plot for proportion of calls by species for each detector
+
+Calls_perc <- df %>%
+  dplyr::select(Spp, location_name, passes) %>%
+  dplyr::group_by(Spp, location_name) %>%
+  dplyr::summarise(n = sum(passes)) %>%
+  dplyr::ungroup() %>%
+  dplyr::group_by(location_name) %>%
+  dplyr::mutate(Percentage = round((n / sum(n) *100), digits = 1))
+
+
+ggplot(Calls_perc, aes(x = location_name, y = Percentage,
+                       fill = Spp)) +
+  geom_bar(stat = "identity") +
+  xlab("\nDetector ID") +
+  ylab("Percentage of calls (%)\n") +
+  scale_fill_manual(values = getPalette(colourCount)) +
+  guides(fill=guide_legend(title="Species")) +
+  theme_bw() +
+  theme (axis.title.y = element_text(colour="black", size=18,
+                                     face="bold")) +
+  theme (axis.title.x = element_text(colour="black", size=18,
+                                     face="bold")) +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour="black",
+                                    linetype="solid"),
+        axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid")) +
+  theme(axis.text.x = element_text(size=16, hjust=1, vjust=0.5,
+                                   colour = "black", 
+                                   angle = 90)) +
+  theme(axis.text.y = element_text(size = 16,
+                                   colour = "black")) +
+  theme(legend.text=element_text(size=16)) +
+  theme(legend.title=element_text(size=18))
+
+```
+
+\newpage
+
+## **PART 2a: Presence Only**
+
+
+**THE NEXT SECTION OF THE REPORT FEATURES THE RAW DATA SUPPLIED TO ECOBAT AND ONLY TAKES INTO ACCOUNT THE PRESENCE, AND NOT THE ABSENCE, OF EACH BAT SPECIES. FOR EACH NIGHT, THERE IS NO 'ZERO DATA' FOR WHEN SPECIES WERE NOT DETECTED.**
+
+
+\newpage
+
+
+## Nightly Bat Pass Rate (Bat passes per hour)
+# Median Per Detector
+
+**Table 16. The median Nightly Pass Rate (bat passes per hour, per night) of each species. If NA, then no bat passes.**
+
+Bat pass rates are often highly variable between nights, with some nights having few or no passes and other nights having high activity.  In these circumstances, the median is likely to be a more useful summary of the 'average' activity than is the mean. For further information see: *Lintott, P. R., & Mathews, F. (2018). Basic mathematical errors may make ecological assessments unreliable. Biodiversity and Conservation, 27(1), 265-267.* <https://doi.org/10.1007/s10531-017-1418-5>
+
+
+```{r}
+
+Table <- df %>%
+  dplyr::group_by(Spp, location_name) %>%
+  dplyr::summarise(Median = round(median(passes.per.hour), digits = 1)) %>%
+  dplyr::rename("Species" = Spp, "Detector ID" = location_name, 
+                "Median Pass Rate" = Median)
+
+  
+results='asis' #important to run this as it ensures the raw table output isn't processed further by knitr
+
+knitr::kable(Table, align="lcc")
+
+```
+
+\newpage
+
+## Nightly Bat Pass Rate (Bat passes per hour)
+# Mean per Detector
+
+**Table 17. The mean Nightly Pass Rate (bat passes per hour, per night) of each species at each detector. Values are given to 1 decimal place.**
+
+
+We recommend using the median values given above, for the reasons stated above, but provide the mean values in the table below.
+
+
+```{r}
+
+Table <- df %>%
+  dplyr::group_by(Spp, location_name) %>%
+  dplyr::summarise(Mean = round(mean(passes.per.hour), digits = 1)) %>%
+  dplyr::rename("Species" = Spp, "Detector ID" = location_name,
+                "Mean Pass Rate" = Mean)
+
+results='asis' #important to run this as it ensures the raw table output isn't processed further by knitr
+
+knitr::kable(Table, align="lcc")
+
+```
+
+\newpage
+
+# Nightly Bat Passes (Bat passes per hour)
+## Per Detector - Figures
+
+**Figure 11.** Boxplots for the number of bat passes per hour each night, for each detector. The 'box' shows the interquartile range, which is where the middle 50% of the data lie. The line dividing the box is the median, the mid-point of the data. The 'whiskers' extend from the box and represent the ranges for the bottom 25% and the top 25% of the data values, excluding outliers. An outlier is any extreme value that lies further away from the box than 1.5 times the interquartile range. Outliers are shown as dots. Where very few passes are recorded it is not possible to produce the box, so the data are shown as a line.
+
+```{r, fig.width=8, fig.height=10}
+
+  for (i in seq_len(n_pages_spp)) {
+
+  print(ggplot(df, aes(location_name, passes.per.hour)) +
+  geom_boxplot(aes(fill=location_name)) +
+  ylab("Nightly Pass Rate (passes/hr/night)\n") +
+  xlab("\nDetector ID") +
+  {if (length(unique(df$location_name))>1)scale_fill_brewer(palette = "RdBu")} +
+  theme_bw() +
+  theme(axis.title.y = element_text(colour="black", size=13,
+                                     face="bold")) +
+  theme(axis.title.x = element_text(colour="black", size=13,
+                                     face="bold")) +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour="black",
+                                    linetype="solid"),
+        axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid")) +
+  theme(axis.text.x = element_text(angle = 90, size=12,
+                                   hjust=0.5, vjust=1,
+                                   colour = "black")) +
+  theme(axis.text.y = element_text(size = 12,
+                                   colour = "black")) +
+  labs(fill = "Detector ID") +
+  facet_wrap_paginate(~species, ncol=2, nrow=3,
+                      scales="fixed", page=i) +
+    theme(strip.text.x = element_text(size=12, face="italic")))
+  }
+
+#########################################################################################
+#########################################################################################
+
+library(ggplot2)
+library(dplyr)
+# save all groups you want to facet by
+all_groups <- unique(df$species)
+
+n_all_groups <- length(all_groups)
+n_col <- 2
+n_row <- 3
+
+# split the groups so that you'd have n_col*nrow groups in each split 
+start_idx <- seq(1, n_all_groups, n_col*n_row)
+
+group_splits <- lapply(start_idx, 
+       function(i){
+         all_groups[i:(i+ n_col*n_row -1)]
+})
+
+# now for each group split filter the data and create a plot
+list_plots <- list()
+
+for(i in length(group_splits)){
+#  i <- i + 1
+  p <- df %>%
+    filter(species %in% group_splits[[1]]) %>% 
+    ggplot(aes(location_name, passes.per.hour)) +
+               geom_boxplot(aes(fill=location_name)) +
+  ylab("Nightly Pass Rate (passes/hr/night)\n") +
+  xlab("\nDetector ID") +
+  {if (length(unique(df$location_name))>1)scale_fill_brewer(palette = "RdBu")} +
+  theme_bw() +
+  theme(axis.title.y = element_text(colour="black", size=13,
+                                     face="bold")) +
+  theme(axis.title.x = element_text(colour="black", size=13,
+                                     face="bold")) +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour="black",
+                                    linetype="solid"),
+        axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid")) +
+  theme(axis.text.x = element_text(angle = 90, size=12,
+                                   hjust=0.5, vjust=1,
+                                   colour = "black")) +
+  theme(axis.text.y = element_text(size = 12,
+                                   colour = "black")) +
+  labs(fill = "Detector ID") +
+  facet_wrap(~ species, ncol = 2, nrow = 3) +  
+    theme(strip.text.x = element_text(size=12, face="italic"))
+  print(p)
+  list_plots[[i]] <- p
+  }
+             
+ list_plots            
+#              
+#     geom_violin(aes(variable, value))+
+#     theme(axis.text.x = element_text(angle = 90))+
+#     
+#   ggsave(plot = p, filename = paste0('Downloads/page_', i, '.jpg'))
+# }
+  
+
+
+
+
+```
+
+
+
+\newpage
+
+# SPLIT BY MONTH
+
+# Total Bat Passes per Detector, each Month 
+## Per Detector
+
+**Table 18. The total number of bat passes of each species in each month at each detector.**
+This table simply tells you how many bats of each species were recorded passing each detector during each month. These numbers are not standardised by the night length, or how many nights each detector was active for during each month.
+
+```{r}
+
+Table <- df %>%
+  dplyr::group_by(Spp, Month, location_name) %>%
+  dplyr::summarise(n = sum(passes)) %>%
+  spread(Month, n) %>%
+  dplyr::rename("Detector ID" = location_name) %>%
+  dplyr::rename("Species" = Spp)
+
+
+# Make all NA's = 0
+Table[is.na(Table)] <- 0
+
+# Table2 <- Table %>% 
+#   remove_rownames %>% 
+#   column_to_rownames(var="species")
+
+
+results='asis' #important to run this as it ensures the raw table output isn't processed further by knitr
+
+panderOptions('table.split.table', 100)
+
+pander(Table, style = "multiline", justify = "left")
+
+```
+
+\newpage
+
+# Survey Effort
+**Table 19. The number of survey nights per month per detector.**
+
+```{r}
+
+Table <- All_data %>%
+  dplyr::group_by(Month, location_name) %>%
+  dplyr::summarise(count = n_distinct(Night)) %>%
+  dplyr::arrange(Month, location_name) %>%
+  dplyr::rename("No. of Survey Nights" = count) %>%
+  dplyr::rename("Detector ID" = location_name)
+
+results='asis' #important to run this as it ensures the raw table output isn't processed further by knitr
+
+knitr::kable(Table, align = "lcc")
+
+```
+
+\newpage
+
+## Nightly Bat Pass Rate for each Month 
+# Median Per Detector
+
+**Table 20. The median Nightly Pass Rate (bat passes per hour, per night) of each species throughout each month. If NA, then no bat passes.**
+
+Bat pass rates are often highly variable between nights, with some nights having few or no passes and other nights having high activity.  In these circumstances, the median is likely to be a more useful summary of the 'average' activity than is the mean. For further information see: *Lintott, P. R., & Mathews, F. (2018). Basic mathematical errors may make ecological assessments unreliable. Biodiversity and Conservation, 27(1), 265-267.* <https://doi.org/10.1007/s10531-017-1418-5>
+
+
+```{r}
+
+Table <- df %>%
+  dplyr::group_by(Spp, Month, location_name) %>%
+  dplyr::summarise(Median = round(median(passes.per.hour), digits = 1)) %>%
+  spread(Month, Median) %>%
+  dplyr::rename("Species" = Spp, "Detector ID" = location_name)
+
+  
+results='asis' #important to run this as it ensures the raw table output isn't processed further by knitr
+
+knitr::kable(Table)
+
+```
+
+\newpage
+
+## Nightly Bat Pass Rate for each Month 
+# Mean per Detector
+
+**Table 21: The mean Nightly Pass Rate (bat passes per hour, per night) of each species throughout each month. Values are given to 1 decimal place.**
+
+
+We recommend using the median values given above, for the reasons stated above, but provide the mean values in the table below.
+
+
+```{r}
+
+Table <- df %>%
+  dplyr::group_by(Spp, Month, location_name) %>%
+  dplyr::summarise(Mean = round(mean(passes.per.hour), digits = 1)) %>%
+  spread(Month, Mean) %>%
+  dplyr::rename("Species" = Spp, "Detector ID" = location_name)
+
+results='asis' #important to run this as it ensures the raw table output isn't processed further by knitr
+
+knitr::kable(Table, align="l")
+
+```
+
+
+
+\newpage
+
+## Nightly Bat Pass Rate for each Month 
+## Per Detector - Figures
+
+**Figure 12.** Figures show boxplots for the number of bat passes per hour by detector, for each month. The 'box' shows the interquartile range, which is where the middle 50% of the data lie. The line dividing the box is the median, the mid-point of the data. The 'whiskers' extend from the box and represent the ranges for the bottom 25% and the top 25% of the data values, excluding outliers. An outlier is any extreme value that lies further away from the box than 1.5 times the interquartile range. Outliers are shown as dots. Where very few passes are recorded it is not possible to produce the box, so the data are shown as a line.
+
+```{r, fig.width=10, fig.height=5}
+
+for (i in unique(df$Spp)) {
+  
+  new <- df %>%
+  dplyr::filter(Spp == i)
+  
+  print(new %>%
+  ggplot2::ggplot(aes(location_name, passes.per.hour)) +
+  geom_boxplot(aes(fill=location_name)) +
+  ylab("Nightly Pass Rate (passes/hr/night)\n") +
+  xlab("\nDetector ID") +
+  {if (length(unique(new$location_name))>1)scale_fill_brewer(palette = "RdBu")} +
+  {if (max(new$n) > 0 & max(new$n) <=1)ylim(0,2)} +
+  {if (max(new$n) > 1 & max(new$n) <=2)ylim(0,3.0)} +
+  {if (max(new$n) > 2 & max(new$n) <=5)ylim(0,6)} +  
+  {if (max(new$n) > 5 & max(new$n) <=10)ylim(0,11)} +
+  {if (max(new$n) > 10 & max(new$n) <=20)ylim(0,22)} +
+  {if (max(new$n) > 20 & max(new$n) <=50)ylim(0,55)} +
+  {if (max(new$n) > 50 & max(new$n) <=100)ylim(0,110)} +
+  {if (max(new$n) > 100 & max(new$n) <=200)ylim(0,220)} +
+  theme_bw() +
+  theme (axis.title.y = element_text(colour="black", size=14,
+                                     face="bold")) +
+  theme (axis.title.x = element_text(colour="black", size=16,
+                                     face="bold")) +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour="black",
+                                    linetype="solid"),
+        axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid")) +
+  theme(axis.text.x = element_text(angle = 90, size=14,
+                                   hjust=1, vjust=0.5,
+                                   colour = "black")) +
+  theme(axis.text.y = element_text(size = 12,
+                                   colour = "black")) +
+  facet_wrap(~Month) +
+  theme(strip.text.x = element_text(size=14)) +
+  ggtitle(i) +
+  theme(plot.title = element_text(face = "bold.italic",
+                                  size = 18)) +
+  theme(legend.position="none"))
+  
+}
+
+```
+
+\newpage
+
+# Bat Activity per Detector Location
+
+**Figure 13.** Detector ID reference:
+
+```{r, fig.width=10, fig.height=8}
+
+Detectors <- df %>%
+  dplyr::group_by(location_name, lat, lon) %>%
+  dplyr::summarise(n = sum(passes))
+  
+
+Detectors %>% 
+  ggplot(aes(x=lon, y=lat)) +
+  geom_point(aes(x=lon, y=lat), fill = "black", 
+             colour = "white") +
+    geom_text(aes(x=lon, y=lat, label=location_name), size=8) +
+    xlab("\nLongitude") +
+    ylab("Latitude\n") +
+    xlim((min(Detectors$lon) - 0.001), 
+         (max(Detectors$lon) + 0.001)) +
+    ylim((min(Detectors$lat) - 0.002), 
+         (max(Detectors$lat) + 0.002)) +
+    guides(fill ="legend") +
+    theme_bw() +
+    theme (legend.position = "right") +
+    theme (axis.title.y = element_text(colour="black", size=18,
+                                     face="bold")) +
+    theme (axis.title.x = element_text(colour="black", size=18,
+                                     face="bold")) +
+    theme(strip.text.x = element_text(size=18, face="bold")) +
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour="black",
+                                    linetype="solid"),
+        axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid")) +
+    theme(axis.text.x = element_text(angle=90, size=16, hjust=1,
+                                     vjust=0.5, 
+                                     colour = "black")) +
+    theme(axis.text.y = element_text(size = 16, 
+                                     colour = "black"))
+
+```
+
+\newpage
+
+**Figure 14.** Median Nightly Pass Rate (bat passes/hr/night) throughout the survey period - represented by the size and colour of the point at each detector location.
+  
+```{r, fig.width=8, fig.height=10}
+
+Table <- df %>%
+  dplyr::group_by(Spp, location_name, lat, lon) %>%
+  dplyr::summarise(Median = median(passes.per.hour)) 
+
+Table <- Table %>%
+  dplyr::rename("Median.Pass.Rate" = Median)
+
+#df$pass
+
+#for (i in seq_len(n_pages_spp)) { 
+
+print(ggplot(Table, aes(lon, lat)) +
+    geom_point(aes(x = lon, y = lat, size= Median.Pass.Rate,
+                   fill = Median.Pass.Rate),
+               colour = "black", pch = 21) +
+    scale_size_area(max_size = 10) +
+    scale_fill_gradient(low = "yellow", high = "red") +
+    xlab("\nLongitude") +
+    ylab("Latitude\n") +
+    xlim((min(Table$lon) - 0.001), (max(Table$lon) + 0.001)) +
+    ylim((min(Table$lat) - 0.002), (max(Table$lat) + 0.002)) +
+    guides(fill ="legend") +
+    theme_bw() +
+    theme(legend.position = "top") +
+    theme(axis.title.y = element_text(colour="black", size=14,
+                                     face="bold")) +
+    theme (axis.title.x = element_text(colour="black", size=14,
+                                     face="bold")) +
+    theme(strip.text.x = element_text(size=14, face="bold")) +
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour="black",
+                                    linetype="solid"),
+        axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid")) +
+    theme(axis.text.x = element_text(angle=90, size=12,
+                                     hjust=1, vjust=0.5,
+                                   colour = "black")) +
+    theme(axis.text.y = element_text(size = 12, 
+                                     colour = "black")) +
+    facet_wrap_paginate(~Spp, ncol=2, nrow=2),  #added a comma here
+                     scales="fixed", page=i) +
+      theme(strip.text.x = element_text(size=12,
+                                        face="italic"))
+
+#}
+
+```
+
+\newpage
+
+**Figure 15.** Maximum Nightly Pass Rate (bat passes/hr/night) recorded in a single night throughout the survey period - represented by the size and colour of the point at each detector location.
+
+```{r, fig.width=8, fig.height=10}
+
+
+Table <- df %>%
+  dplyr::group_by(Spp, location_name, lat, lon) %>%
+  dplyr::arrange(passes.per.hour) %>%
+  dplyr::top_n(1, passes.per.hour) %>%
+  dplyr::filter(row_number()==1) %>%
+  dplyr::rename("Max.Pass.Rate" = passes.per.hour)
+
+for (i in seq_len(n_pages_spp)) { 
+
+print(ggplot(Table, aes(lon, lat)) +
+    geom_point(aes(x = lon, y = lat, size=Max.Pass.Rate,
+                   fill = Max.Pass.Rate),
+               colour = "black", pch = 21) +
+    scale_size_area(max_size = 10) +
+    scale_fill_gradient(low = "yellow", high = "red") +
+    xlab("\nLongitude") +
+    ylab("Latitude\n") +
+    xlim((min(Table$lon) - 0.001), (max(Table$lon) + 0.001)) +
+    ylim((min(Table$lat) - 0.002), (max(Table$lat) + 0.002)) +
+    guides(fill ="legend") +
+    theme_bw() +
+    theme(legend.position = "top") +
+    theme(axis.title.y = element_text(colour="black", size=14,
+                                     face="bold")) +
+    theme(axis.title.x = element_text(colour="black", size=14,
+                                     face="bold")) +
+    theme(strip.text.x = element_text(size=14, face="bold")) +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.border = element_rect(colour="black",
+                                      linetype="solid"),
+          axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid")) +
+    theme(axis.text.x = element_text(angle=90, size=12,
+                                     hjust=1, vjust=0.5,
+                                   colour = "black")) +
+    theme(axis.text.y = element_text(size = 12,
+                                     colour = "black")) +
+    facet_wrap_paginate(~Spp, ncol=2, nrow=2,
+                      scales="fixed", page=i) +
+      theme(strip.text.x = element_text(size=12,
+                                        face="italic")))
+}
+ 
+```
+
+\newpage
+
+
+## **PART 2B: Includes absences**
+
+
+**THE NEXT SECTION OF THE REPORT FEATURES THE DATA SUPPLIED TO ECOBAT BUT TAKES INTO ACCOUNT SPECIES ABSENCES, AND THEREFORE INCLUDES 'ZERO DATA' FOR WHEN SPECIES WERE NOT DETECTED AT EACH DETECTOR ON A NIGHT. THIS DRAMATICALLY LOWERS THE MEANS AND MEDIANS OF THE DATA PRESENTED.**
+
+
+\newpage
+
+
+## Nightly Bat Pass Rate (Bat passes per hour)
+# Median Per Detector
+
+**Table 22. The median Nightly Pass Rate (bat passes per hour, per night) of each species. If NA, then no bat passes.**
+
+Bat pass rates are often highly variable between nights, with some nights having few or no passes and other nights having high activity.  In these circumstances, the median is likely to be a more useful summary of the 'average' activity than is the mean. For further information see: *Lintott, P. R., & Mathews, F. (2018). Basic mathematical errors may make ecological assessments unreliable. Biodiversity and Conservation, 27(1), 265-267.* <https://doi.org/10.1007/s10531-017-1418-5>
+
+
+```{r}
+
+Table <- df_zero %>%
+  dplyr::group_by(Spp, location_name) %>%
+  dplyr::summarise(Median = round(median(passes.per.hour), digits = 1)) %>%
+  dplyr::rename("Species" = Spp, "Detector ID" = location_name, 
+                "Median Pass Rate" = Median)
+
+  
+results='asis' #important to run this as it ensures the raw table output isn't processed further by knitr
+
+knitr::kable(Table, align="l")
+
+```
+
+\newpage
+
+## Nightly Bat Pass Rate (Bat passes per hour)
+# Mean per Detector
+
+**Table 23. The mean Nightly Pass Rate (bat passes per hour, per night) of each species at each detector. Values are given to 1 decimal place.**
+
+
+We recommend using the median values given above, for the reasons stated above, but provide the mean values in the table below.
+
+
+```{r}
+
+Table <- df_zero %>%
+  dplyr::group_by(Spp, location_name) %>%
+  dplyr::summarise(Mean = round(mean(passes.per.hour), digits = 1)) %>%
+  dplyr::rename("Species" = Spp, "Detector ID" = location_name,
+                "Mean Pass Rate" = Mean)
+
+results='asis' #important to run this as it ensures the raw table output isn't processed further by knitr
+
+knitr::kable(Table, align="l")
+
+```
+
+\newpage
+
+# Nightly Bat Passes (Bat passes per hour)
+## Per Detector - Figures
+
+**Figure 16.** Figures show boxplots for the number of bat passes per hour each night, for each detector. The 'box' shows the interquartile range, which is where the middle 50% of the data lie. The line dividing the box is the median, the mid-point of the data. The 'whiskers' extend from the box and represent the ranges for the bottom 25% and the top 25% of the data values, excluding outliers. An outlier is any extreme value that lies further away from the box than 1.5 times the interquartile range. Outliers are shown as dots. Where very few passes are recorded it is not possible to produce the box, so the data are shown as a line.
+
+```{r, fig.width=8, fig.height=10}
+
+ for (i in seq_len(n_pages_spp)) {
+
+  print(ggplot(df_zero, aes(location_name, passes.per.hour)) +
+  geom_boxplot(aes(fill=location_name)) +
+  ylab("Nightly Pass Rate (passes/hr/night)\n") +
+  xlab("\nDetector ID") +
+  {if (length(unique(df$location_name))>1)scale_fill_brewer(palette = "RdBu")} +
+  theme_bw() +
+  theme (axis.title.y = element_text(colour="black", size=13,
+                                     face="bold")) +
+  theme (axis.title.x = element_text(colour="black", size=13,
+                                     face="bold")) +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour="black",
+                                    linetype="solid"),
+        axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid")) +
+  theme(axis.text.x = element_text(angle = 90, size=12,
+                                   hjust=0.5, vjust=1,
+                                   colour = "black")) +
+  theme(axis.text.y = element_text(size = 13,
+                                   colour = "black")) +
+  labs(fill = "Detector ID") +
+  facet_wrap_paginate(~species, ncol=2, nrow=3,
+                      scales="fixed", page=i) +
+    theme(strip.text.x = element_text(size=12, face="italic")))
+}
+
+```
+
+
+
+\newpage
+
+# Survey Effort
+**Table 24. The number of nights bats were detected per month per detector.**
+
+```{r}
+
+Table <- All_data %>%
+  dplyr::group_by(Month, location_name) %>%
+  dplyr::summarise(count = n_distinct(Night)) %>%
+  dplyr::arrange(Month, location_name) %>%
+  dplyr::rename("No of Survey Nights" = count) %>%
+  dplyr::rename("Detector ID" = location_name)
+
+results='asis' #important to run this as it ensures the raw table output isn't processed further by knitr
+
+knitr::kable(Table, align = "lc")
+
+```
+
+\newpage
+
+## Nightly Bat Pass Rate for each Month 
+# Median Per Detector
+
+**Table 25. The median Nightly Pass Rate (bat passes per hour, per night) of each species throughout each month. If NA, then no bat passes.**
+
+Bat pass rates are often highly variable between nights, with some nights having few or no passes and other nights having high activity.  In these circumstances, the median is likely to be a more useful summary of the 'average' activity than is the mean. For further information see: *Lintott, P. R., & Mathews, F. (2018). Basic mathematical errors may make ecological assessments unreliable. Biodiversity and Conservation, 27(1), 265-267.* <https://doi.org/10.1007/s10531-017-1418-5>
+
+
+```{r}
+
+
+Table <- df_zero %>%
+  dplyr::group_by(Spp, Month, location_name) %>%
+  dplyr::summarise(Median = round(median(passes.per.hour), digits = 1)) %>%
+  spread(Month, Median) %>%
+  dplyr::rename("Species" = Spp, "Detector ID" = location_name)
+
+  
+results='asis' #important to run this as it ensures the raw table output isn't processed further by knitr
+
+knitr::kable(Table)
+
+```
+
+\newpage
+
+## Nightly Bat Pass Rate for each Month 
+# Mean per Detector
+
+**Table 26. The mean Nightly Pass Rate (bat passes per hour, per night) of each species throughout each month. Values are given to 1 decimal place.**
+
+
+We recommend using the median values given above, for the reasons stated above, but provide the mean values in the table below.
+
+
+```{r}
+
+Table <- df_zero %>%
+  dplyr::group_by(Spp, Month, location_name) %>%
+  dplyr::summarise(Mean = round(mean(passes.per.hour), digits = 1)) %>%
+  spread(Month, Mean) %>%
+  dplyr::rename("Species" = Spp, "Detector ID" = location_name)
+
+results='asis' #important to run this as it ensures the raw table output isn't processed further by knitr
+
+knitr::kable(Table, align="l")
+
+```
+
+
+
+\newpage
+
+## Nightly Bat Pass Rate for each Month 
+## Per Detector - Figures
+
+**Figure 17.** Figures show boxplots for the number of bat passes per hour by detector, for each month. The 'box' shows the interquartile range, which is where the middle 50% of the data lie. The line dividing the box is the median, the mid-point of the data. The 'whiskers' extend from the box and represent the ranges for the bottom 25% and the top 25% of the data values, excluding outliers. An outlier is any extreme value that lies further away from the box than 1.5 times the interquartile range. Outliers are shown as dots. Where very few passes are recorded it is not possible to produce the box, so the data are shown as a line.
+
+```{r, fig.width=10, fig.height=5}
+
+for (i in unique(df_zero$Spp)) {
+  
+  new <- df_zero %>%
+  dplyr::filter(Spp == i)
+  
+  print(new %>%
+  ggplot2::ggplot(aes(location_name, passes.per.hour)) +
+  geom_boxplot(aes(fill=location_name)) +
+  ylab("Nightly Pass Rate (passes/hr/night)\n") +
+  xlab("\nDetector ID") +
+  {if (length(unique(new$location_name))>1)scale_fill_brewer(palette = "RdBu")} +  
+  {if (max(new$n) > 0 & max(new$n) <=1)ylim(0,2)} +
+  {if (max(new$n) > 1 & max(new$n) <=2)ylim(0,3.0)} +
+  {if (max(new$n) > 2 & max(new$n) <=5)ylim(0,6)} +  
+  {if (max(new$n) > 5 & max(new$n) <=10)ylim(0,11)} +
+  {if (max(new$n) > 10 & max(new$n) <=20)ylim(0,22)} +
+  {if (max(new$n) > 20 & max(new$n) <=50)ylim(0,55)} +
+  {if (max(new$n) > 50 & max(new$n) <=100)ylim(0,110)} +
+  {if (max(new$n) > 100 & max(new$n) <=200)ylim(0,220)} +
+  theme_bw() +
+  theme(axis.title.y = element_text(colour="black", size=14,
+                                     face="bold")) +
+  theme(axis.title.x = element_text(colour="black", size=14,
+                                     face="bold")) +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour="black",
+                                    linetype="solid"),
+        axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid")) +
+  theme(axis.text.x = element_text(angle = 90, size=12, hjust=1,
+                                   vjust=0.5,
+                                   colour = "black")) +
+  theme(axis.text.y = element_text(size = 12,
+                                   colour = "black")) +
+  facet_wrap(~Month) +
+  theme(strip.text.x = element_text(size=12)) +
+  ggtitle(i) +
+  theme(plot.title = element_text(face = "bold.italic",
+                                  size = 16)) +
+  theme(legend.position="none"))
+  
+}
+
+```
+
+
+\newpage
+
+# Bat Activity per Detector Location
+
+**Figure 18.** Detector ID reference:
+
+```{r, fig.width=10, fig.height=8}
+
+Detectors <- df_zero %>%
+  dplyr::group_by(location_name, lat, lon) %>%
+  dplyr::summarise(n = sum(passes))
+  
+
+Detectors %>% 
+  ggplot(aes(x=lon, y=lat)) +
+  geom_point(aes(x=lon, y=lat), fill = "black", 
+             colour = "white") +
+    geom_text(aes(x=lon, y=lat, label=location_name), size=10) +
+    xlab("\nLongitude") +
+    ylab("Latitude\n") +
+    xlim((min(Detectors$lon) - 0.001),
+         (max(Detectors$lon) + 0.001)) +
+    ylim((min(Detectors$lat) - 0.002),
+         (max(Detectors$lat) + 0.002)) +
+    guides(fill ="legend") +
+    theme_bw() +
+    theme (legend.position = "right") +
+    theme (axis.title.y = element_text(colour="black", size=16,
+                                     face="bold")) +
+    theme (axis.title.x = element_text(colour="black", size=16,
+                                     face="bold")) +
+    theme(strip.text.x = element_text(size=18, face="bold")) +
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour="black",
+                                    linetype="solid"),
+        axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid")) +
+    theme(axis.text.x = element_text(angle=90, size=14,
+                                     hjust=1, vjust=0.5,
+                                     colour = "black")) +
+    theme(axis.text.y = element_text(size = 14,
+                                     colour = "black"))
+
+```
+
+\newpage
+
+**Figure 19.** Median Nightly Pass Rate (bat passes/hr/night) throughout the survey period - represented by the size and colour of the point at each detector location.
+  
+```{r, fig.width=8, fig.height=10}
+
+Table <- df_zero %>%
+  dplyr::group_by(Spp, location_name, lat, lon) %>%
+  dplyr::summarise(Median = median(passes.per.hour)) %>%
+  dplyr::rename("Median.Pass.Rate" = Median)
+
+
+
+for (i in seq_len(n_pages_spp)) { 
+
+print(ggplot(Table, aes(lon, lat)) +
+    geom_point(aes(x = lon, y = lat, size= Median.Pass.Rate,
+                   fill = Median.Pass.Rate),
+               colour = "black", pch = 21) +
+    scale_size_area(max_size = 10) +
+    scale_fill_gradient(low = "yellow", high = "red") +
+    xlab("\nLongitude") +
+    ylab("Latitude\n") +
+    xlim((min(Table$lon) - 0.001), (max(Table$lon) + 0.001)) +
+    ylim((min(Table$lat) - 0.002), (max(Table$lat) + 0.002)) +
+    guides(fill ="legend") +
+    theme_bw() +
+    theme (legend.position = "top") +
+    theme (axis.title.y = element_text(colour="black", size=14,
+                                     face="bold")) +
+    theme (axis.title.x = element_text(colour="black", size=14,
+                                     face="bold")) +
+    theme(strip.text.x = element_text(size=14, face="bold")) +
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour="black",
+                                    linetype="solid"),
+        axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid")) +
+    theme(axis.text.x = element_text(angle=90, size=12,
+                                     hjust=1, vjust=0.5,
+                                   colour = "black")) +
+    theme(axis.text.y = element_text(size = 12,
+                                     colour = "black")) +
+    facet_wrap_paginate(~Spp, ncol=2, nrow=2,
+                      scales="fixed", page=i) +
+      theme(strip.text.x = element_text(size=12,
+                                        face="italic")))
+}
+
+```
+
+\newpage
+
+**Figure 20.** Maximum Nightly Pass Rate (bat passes/hr/night) recorded in a single night throughout the survey period - represented by the size and colour of the point at each detector location.
+
+```{r, fig.width=8, fig.height=10}
+
+
+Table <- df_zero %>%
+  dplyr::group_by(Spp, location_name, lat, lon) %>%
+  dplyr::arrange(passes.per.hour) %>%
+  dplyr::top_n(1, passes.per.hour) %>%
+  dplyr::filter(row_number()==1) %>%
+  dplyr::rename("Max.Pass.Rate" = passes.per.hour)
+
+for (i in seq_len(n_pages_spp)) { 
+
+print(ggplot(Table, aes(lon, lat)) +
+    geom_point(aes(x = lon, y = lat, size=Max.Pass.Rate,
+                   fill = Max.Pass.Rate),
+               colour = "black", pch = 21) +
+    scale_size_area(max_size = 10) +
+    scale_fill_gradient(low = "yellow", high = "red") +
+    xlab("\nLongitude") +
+    ylab("Latitude\n") +
+    xlim((min(Table$lon) - 0.001), (max(Table$lon) + 0.001)) +
+    ylim((min(Table$lat) - 0.002), (max(Table$lat) + 0.002)) +
+    guides(fill ="legend") +
+    theme_bw() +
+    theme(legend.position = "top") +
+    theme(axis.title.y = element_text(colour="black", size=14,
+                                     face="bold")) +
+    theme(axis.title.x = element_text(colour="black", size=14,
+                                     face="bold")) +
+    theme(strip.text.x = element_text(size=14, face="bold")) +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.border = element_rect(colour="black",
+                                      linetype="solid"),
+          axis.line=element_line(size=0.5, colour="black",
+                               linetype="solid")) +
+    theme(axis.text.x = element_text(angle=90, size=12,
+                                     hjust=1, vjust=0.5,
+                                     colour = "black")) +
+    theme(axis.text.y = element_text(size = 12,
+                                     colour = "black")) +
+    facet_wrap_paginate(~Spp, ncol=2, nrow=2,
+                      scales="fixed", page=i) +
+      theme(strip.text.x = element_text(size=12,
+                                        face="italic")))
+}
+
+ 
+```
+
+
+**Thank you for using Ecobat! If you have any questions please email info@themammalsociety.org**
