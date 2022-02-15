@@ -1,6 +1,6 @@
 ######## PRE MARKDOWN SCRIPT ###########
 ## AUTHOR: Charlie Le Marquand
-## DATE LAST EDITED: 15/12/2021
+## DATE LAST EDITED: 15/02/2022
 #######################################################################################################################
 
 #NEXT STEPS:
@@ -22,23 +22,37 @@ library(lubridate)
 
 print("starting Ecobat2.R script")
 
-print("testing 1")
-
 options(shiny.sanitize.errors=FALSE)
 
-print("testing 2")
-
 #when doing manually
-# dataframe1 <- read.csv("EcobatDF.csv")
+# dataframe1 <- read.csv("EcobatDF.rdata") #changed all EcobatDF.csv files to Ecobat.rdata
 
 token <- params$Token
 
 #print(sort( sapply(ls(),function(x){object.size(get(x))}))) #print memory of things in local environment
 
 #when doing from dropbox
-dataframe1 <- rdrop2::drop_read_csv("ecobat/EcobatDF.csv", header = TRUE) # cut out:, dtoken = token) - guidance says should find it
+#dataframe1 <- rdrop2::drop_download("ecobat/EcobatDF.rdata", overwrite = TRUE) #, header = TRUE) # cut out:, dtoken = token) - guidance says should find it - changed drop_read_csv to drop_get for rdata
+
+################################
+### new code for doing as rdata format...
+# Create a path to a temporary file
+
+temp <- tempfile()
+
+# Download the file to the temporary location
+rdrop2::drop_download(path = "ecobat/EcobatDF.rds",local_path = temp)
+
+# Read in the file
+dataframe1 <- readRDS(temp)
+
+
+# delete the temporary file
+unlink(temp)
 
 print("database read in")
+
+################################
 
 dataframe1 <- dataframe1 %>%
   select(-"X")
@@ -53,7 +67,7 @@ print("removed passes from dataframe1")
 
 ######################################################
 
-# WHICH VERSION OF PROMORMA LOADING AND PARAMS TO USE
+# WHICH VERSION OF PROFORMA LOADING AND PARAMS TO USE
 
 # #when doing manually
 # proforma <- read.csv("file.csv")
@@ -239,18 +253,18 @@ print(colnames(dataframe1))
  if (save == "New records, save to database") {newmaster <- rbind(dataframe1, proforma)
  print("df and proforma combined to make newmaster")
   #move original master to a holding folder
-  drop_move(from_path = "ecobat/EcobatDF.csv", to_path = "holding/EcobatDF.csv")
+  drop_move(from_path = "ecobat/EcobatDF.rdata", to_path = "holding/EcobatDF.rdata")
   print("dropbox dataframe has been moved to holding folder")
   
   #write new master into dropbox and then move into ecobat folder - having issues trying to write straight into it
-  write.csv(newmaster, file = "EcobatDF.csv")
-  drop_upload("EcobatDF.csv")
+  write.csv(newmaster, file = "EcobatDF.rdata")
+  drop_upload("EcobatDF.rdata")
   print("newmaster is on dropbox")
-  drop_move(from_path = "EcobatDF.csv", to_path = "ecobat/EcobatDF.csv")
+  drop_move(from_path = "EcobatDF.rdata", to_path = "ecobat/EcobatDF.rdata")
   print("newmaster is in ecobat folder on dropbox")
   
   #delete the master copy in the holding folder
-  drop_delete(path = "holding/EcobatDF.csv")
+  drop_delete(path = "holding/EcobatDF.rdata")
   print("old master in holding has been deleted")
   
   print("data has been saved to the database")
