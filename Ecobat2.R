@@ -369,69 +369,46 @@ print("survey month etc worked out, month of proforma changed to integer")
 
 onerow <- proforma[1,]
 
-option1 <- dataframe1
-print("option 1 done")
-
-# option2 = geofilter = county and timefilter = all data
-option2 <- dataframe1 %>%
-  filter(county == onerow$county)
-print("option 2 done")
-
-#option 3 = geofilter = region and timefilter = all data
-option3 <- dataframe1 %>%
-  filter(region == onerow$region)
-print("option 3 done")
-
-#option 4 = geofilter = country and timefilter = all data
-option4 <- dataframe1 %>%
-  filter(country == onerow$country)
-print("option 4 done")
-
-#option 5 = geofilter = all data and timefilter = +/- a month from start date
-option5 <- dataframe1 %>%
-  filter(month %in% (premonth:postmonth))
-print("option 5 done")
-
-# option 6 = geofilter = county and timefilter = +/1 a month from start date
-option6 <- dataframe1 %>%
-  filter(county == onerow$county) %>%
-  filter(month %in% (premonth:postmonth))
-print("option 6 done")
-
-# option 7 = geofilter = region and timefilter = +/- a month from start date
-option7 <- dataframe1 %>%
-  filter(region == onerow$region) %>%
-  filter(month %in% (premonth:postmonth))
-print("option 7 done")
-
-#option 8 = geofilter = country and timefilter = +/- a month from start date
-option8 <- dataframe1 %>%
-  filter(country == onerow$country) %>%
-  filter(month %in% (premonth:postmonth))
-print("option 8 done")
-
-#next need to decide which option need to use
+#next need to decide which option need to use, and create it
 if (geofilter == "All Data" & timefilter == "All Data") {
-  dataframe2 <- option1
+  dataframe2 <- dataframe1
+  print("option 1 done")
 } else if (geofilter == "County" & timefilter == "All Data") {
-  dataframe2 <- option2
+  dataframe2 <- dataframe1 %>%
+    filter(county == onerow$county)
+  print("option 2 done")
 } else if (geofilter == "Region" & timefilter == "All Data") {
-  dataframe2 <- option3
+  dataframe2 <- dataframe1 %>%
+    filter(region == onerow$region)
+  print("option 3 done")
 } else if (geofilter == "Country" & timefilter == "All Data") {
-  dataframe2 <- option4
+  dataframe2 <- dataframe1 %>%
+    filter(country == onerow$country)
+  print("option 4 done")
 } else if (geofilter == "All Data" & timefilter == "+/- 1 month from survey start date") {
-  dataframe2 <- option5
+  dataframe2 <- dataframe1 %>%
+    filter(month %in% (premonth:postmonth))
+  print("option 5 done")
 } else if (geofilter == "County" & timefilter == "+/- 1 month from survey start date") {
-  dataframe2 <- option6
+  dataframe2 <- dataframe1 %>%
+    filter(county == onerow$county) %>%
+    filter(month %in% (premonth:postmonth))
+  print("option 6 done")
 } else if (geofilter == "Region" & timefilter == "+/- 1 month from survey start date") {
-  dataframe2 <- option7
+  dataframe2 <- dataframe1 %>%
+    filter(region == onerow$region) %>%
+    filter(month %in% (premonth:postmonth))
+  print("option 7 done")
 } else if (geofilter == "Country" & timefilter == "+/- 1 month from survey start date") {
-  dataframe2 <- option8
+  dataframe2 <- dataframe1 %>%
+    filter(country == onerow$country) %>%
+    filter(month %in% (premonth:postmonth))
+  print("option 8 done")
 } else {print("error no option assigned")
 }
 
-#now df is the option we want, remove the options from environment to free up space
-rm(option1, option2, option3, option4, option5, option6, option7, option8, dataframe1)
+#remove the original dataframe to save space
+rm(dataframe1)
 
 #######################################################################################################################  
 
