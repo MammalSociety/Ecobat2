@@ -15,6 +15,21 @@ library(rdrop2)
 library(shinyjs)
 library(tinytex) #need for creating a pdf
 
+# required in Ecobat2.R
+library(tidyverse)
+library(rsconnect) #for connecting to shiny.io
+library(rdrop2) #for connecting to dropbox
+library(lubridate)
+
+# Required Nightly.Rmd
+library(plyr) # # percentiles code uses plyr as its older
+library(suncalc) # Sunrise/ sunset times
+library(gtable) #since doing ggforce fix it now wants this package
+library(reshape2) # wide/short data format conversions
+library(RColorBrewer) #colourblind friendly scales on figures
+library(png)
+library(grid)
+
 #drop_auth(rdstoken = "droptoken.rds")
 
 #for if ever need to make a new token

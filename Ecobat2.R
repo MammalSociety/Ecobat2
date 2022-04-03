@@ -41,7 +41,9 @@ token <- params$Token
 temp <- tempfile()
 
 # Download the file to the temporary location
-rdrop2::drop_download(path = "ecobat/EcobatDF.rds",local_path = temp)
+rdrop2::drop_download(path = "ecobat/EcobatDF.rds",
+                      local_path = temp,
+                      dtoken = token)
 
 # Read in the file
 dataframe1 <- readRDS(temp)
