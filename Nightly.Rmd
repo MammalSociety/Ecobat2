@@ -28,7 +28,7 @@ header-includes:
 
 # sets the global options for the word doc (don't show echo of the r code, or warnings etc in the produced word doc)
 
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message=FALSE, comment=NULL)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message=FALSE, comment=NULL,error = TRUE)
 
 #source("Ecobat2.R", local = knitr::knit_global())
 # or sys.source("your-script.R", envir = knitr::knit_global())

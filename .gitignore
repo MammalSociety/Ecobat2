@@ -5,3 +5,7 @@
 droptoken.rds
 .httr-oauth
 data/
+renv
+rsconnect
+.Renviron
+.Rprofile

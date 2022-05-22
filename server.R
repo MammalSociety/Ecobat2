@@ -30,6 +30,8 @@ library(RColorBrewer) #colourblind friendly scales on figures
 library(png)
 library(grid)
 
+library(lobstr) # for checking memory
+
 #drop_auth(rdstoken = "droptoken.rds")
 
 #for if ever need to make a new token
@@ -39,6 +41,11 @@ library(grid)
 
 options(shiny.maxRequestSize=50*1024^2)
 # the default file size limit is 50MB, the above code ups it to 50MB
+
+#print some session info
+sessionInfo()
+mem_used()
+system('grep MemTotal /proc/meminfo')
 
 shinyServer(function(input, output) {
 
@@ -109,17 +116,21 @@ shinyServer(function(input, output) {
                        Save = save,
                        Token = token)
         
-        incProgress(0.3, "Building report, this may take a minute...")
+        incProgress(0.3, "Pre-processing, this may take a minute...")
         
         # Knit the document, passing in the `params` list, and eval it in a
         # child of the global environment (this isolates the code in the document
         # from the code in this app).
-        source("Ecobat2.R", local = knitr::knit_global()) 
+        #source("Ecobat2.R", local = knitr::knit_global()) 
+        source("Ecobat2.R") 
+        
+        incProgress(0.4, "Building report, this may take a minute...")
         
         rmarkdown::render(file.path(tempdir(), "Nightly.Rmd"),
                           output_file = file,
-                          params = params,
-                          envir = new.env(parent = globalenv()))
+                          params = params#,
+                          #envir = new.env(parent = globalenv())
+                          )
         
         incProgress(1, "Report complete")
                           

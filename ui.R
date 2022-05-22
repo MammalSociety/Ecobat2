@@ -1,12 +1,12 @@
 #load packages - not sure if necessary
 library(shiny)
-library(rmarkdown) 
-library(ggplot2)
-library(knitr)
-library(pander)
-library(dplyr)
-library(tidyr)
-library(rcompanion)
+# library(rmarkdown) 
+# library(ggplot2)
+# library(knitr)
+# library(pander)
+# library(dplyr)
+# library(tidyr)
+# library(rcompanion)
 
 ui<-(fluidPage( #fluidpage means page width determined by window size
   titlePanel("*Within Night* Bat Activity Analysis"), #title of Shiny app
@@ -35,7 +35,7 @@ ui<-(fluidPage( #fluidpage means page width determined by window size
       textInput(inputId = "SiteName", label = "Insert Site Name"), #input field for site name
       selectInput("GeoFilter", "Geographic Filter", c("All Data", "County", "Region", "Country")),
       selectInput("TimeFilter", "Time Filter", c("All Data", "+/- 1 month from survey start date")),
-      selectInput("Save", "Save Options", c("Please Select", "New records, save to database","Already uploaded records, do NOT save to database")),
+      selectInput("Save", "Save Options", c("Please Select", "New records, save to database","Already uploaded records, do NOT save to database"),selected = "Already uploaded records, do NOT save to database"),
       
       tags$hr(), #adds a horizontal line
       uiOutput("ui.download"), # instead of conditionalPanel
